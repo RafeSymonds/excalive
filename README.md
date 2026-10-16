@@ -99,13 +99,17 @@ Needs `node`, `ffmpeg`, [`uv`](https://docs.astral.sh/uv/), and
 or later, whose headless renderer draws every frame. Slidev is only
 needed to export a deck to PDF or PPTX.
 
-With Claude Code, install it as a plugin. That brings the `excalive`
-skill, which tells the agent how to draw scenes, write the story and run
-the checks, along with the command itself:
+The repository is a Claude Code skill. Clone it into your skills folder
+and you get both: Claude Code reads `SKILL.md`, which tells the agent how
+to draw scenes, write the story and run the checks, and the command it
+runs is `bin/excalive` in the same folder.
 
-    /plugin install excalive --marketplace RafeSymonds/excalive
+    git clone https://github.com/RafeSymonds/excalive ~/.claude/skills/excalive
 
-Without Claude Code, clone it and run `bin/excalive` from the checkout:
+For one project only, clone it into that project's
+`.claude/skills/excalive` instead. To update, `git pull` in the clone.
+
+Without Claude Code, clone it anywhere and run `bin/excalive`:
 
     git clone https://github.com/RafeSymonds/excalive
     excalive/bin/excalive check excalive/examples/hello/story.md
@@ -189,7 +193,7 @@ about three and a half minutes on an M-series Mac.
 
 ## With a coding agent
 
-The plugin's skill gives an agent the whole loop: draw, write, check,
+The skill gives an agent the whole loop: draw, write, check,
 build, look at the contact sheets. [`docs/workflow.md`](docs/workflow.md)
 says how to hand a batch of decks to agents one at a time, and what goes
 wrong when you do not. `excalive usage` measures what a run cost from
@@ -202,8 +206,7 @@ its transcripts.
   writing titles and list items, and the rules for a narrated video.
 - [`docs/workflow.md`](docs/workflow.md): a deck and its video, step by
   step, and how to run agents on it.
-- [`skills/excalive/SKILL.md`](skills/excalive/SKILL.md): the skill the
-  plugin installs.
+- [`SKILL.md`](SKILL.md): the skill Claude Code loads.
 - `scripts/story.py` and `scripts/animate.mjs` open with their full
   reference: every front matter key and every storyboard field.
 
@@ -216,7 +219,7 @@ its transcripts.
 | `scripts/animate.mjs` | The renderer: keyframes to frames, frames to video, the checks |
 | `scripts/usage.py` | Transcript costs |
 | `assets/fonts/` | Nunito, which the headless renderer lacks |
-| `skills/excalive/`, `.claude-plugin/` | The Claude Code skill and plugin |
+| `SKILL.md` | The Claude Code skill |
 | `examples/` | Three stories with their scenes |
 | `docs/` | Style and workflow |
 
