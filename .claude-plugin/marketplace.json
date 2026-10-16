@@ -1,0 +1,13 @@
+{
+  "name": "excalive",
+  "description": "excalive: hand-drawn decks and narrated videos from Excalidraw scenes.",
+  "owner": {"name": "Rafe Symonds"},
+  "plugins": [
+    {
+      "name": "excalive",
+      "description": "Hand-drawn slide decks and narrated videos from Excalidraw scenes and one markdown story.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "excalive",
+  "description": "Hand-drawn slide decks and narrated videos from Excalidraw scenes and one markdown story, with checks that every word on screen is said.",
+  "version": "0.1.0",
+  "author": {"name": "Rafe Symonds"},
+  "homepage": "https://github.com/RafeSymonds/excalive",
+  "repository": "https://github.com/RafeSymonds/excalive",
+  "license": "MIT"
+}

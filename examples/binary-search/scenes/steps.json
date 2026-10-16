@@ -1,0 +1,26 @@
+{
+  "title-card": [
+    ["frame", "title", "series"]
+  ],
+  "search": [
+    ["frame", "b0", "bn0", "b1", "bn1", "b2", "bn2", "b3", "bn3", "b4", "bn4", "b5", "bn5", "b6", "bn6", "b7", "bn7", "b8", "bn8", "b9", "bn9", "b10", "bn10", "b11", "bn11", "b12", "bn12", "b13", "bn13", "b14", "bn14"],
+    ["frame", "b0", "bn0", "b1", "bn1", "b2", "bn2", "b3", "bn3", "b4", "bn4", "b5", "bn5", "b6", "bn6", "b7", "bn7", "b8", "bn8", "b9", "bn9", "b10", "bn10", "b11", "bn11", "b12", "bn12", "b13", "bn13", "b14", "bn14", "range", "lo", "hi"],
+    ["frame", "b0", "bn0", "b1", "bn1", "b2", "bn2", "b3", "bn3", "b4", "bn4", "b5", "bn5", "b6", "bn6", "b7", "bn7", "b8", "bn8", "b9", "bn9", "b10", "bn10", "b11", "bn11", "b12", "bn12", "b13", "bn13", "b14", "bn14", "range", "lo", "hi", "mid-t", "mid"],
+    "search-3",
+    "search-4",
+    "search-5",
+    "search-6",
+    "search-7",
+    "search-8",
+    "search-9"
+  ],
+  "code": [
+    ["frame", "title", "code-box", "code"],
+    ["frame", "title", "code-box", "code", "n0", "n0-a"],
+    ["frame", "title", "code-box", "code", "n0", "n0-a", "n1", "n1-a"],
+    ["frame", "title", "code-box", "code", "n0", "n0-a", "n1", "n1-a", "n2", "n2-a", "n2-a1"]
+  ],
+  "end": [
+    ["frame", "title", "thanks"]
+  ]
+}

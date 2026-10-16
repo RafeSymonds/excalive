@@ -1,0 +1,16 @@
+{
+  "title-card": [["frame", "title", "series"]],
+  "what": [
+    ["frame", "title"],
+    ["frame", "title", "m0", "i0"],
+    ["frame", "title", "m0", "i0", "m1", "i1"],
+    ["frame", "title", "m0", "i0", "m1", "i1", "m2", "i2"]
+  ],
+  "flow": [
+    ["frame", "story", "story-t", "scenes", "scenes-t"],
+    ["frame", "story", "story-t", "scenes", "scenes-t", "a-story", "a-scenes", "tool", "tool-t"],
+    ["frame", "story", "story-t", "scenes", "scenes-t", "a-story", "a-scenes", "tool", "tool-t",
+     "a-deck", "a-video", "deck", "deck-t", "video", "video-t"]
+  ],
+  "end": [["frame", "title", "thanks"]]
+}
