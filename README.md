@@ -99,25 +99,28 @@ Needs `node`, `ffmpeg`, [`uv`](https://docs.astral.sh/uv/), and
 or later, whose headless renderer draws every frame. Slidev is only
 needed to export a deck to PDF or PPTX.
 
-The repository is a Claude Code skill. Clone it into your skills folder
-and you get both: Claude Code reads `SKILL.md`, which tells the agent how
-to draw scenes, write the story and run the checks, and the command it
-runs is `bin/excalive` in the same folder.
+excalive is an agent skill with its command inside it. Install it with
+the [skills](https://github.com/vercel-labs/skills) installer, which works
+for Claude Code, Codex, Cursor and other agents:
 
-    git clone https://github.com/RafeSymonds/excalive ~/.claude/skills/excalive
+    npx skills add RafeSymonds/excalive -g
 
-For one project only, clone it into that project's
-`.claude/skills/excalive` instead. To update, `git pull` in the clone.
+`-g` installs it for your user (for Claude Code, in `~/.claude/skills`);
+leave it off to install into the current project. Update with
+`npx skills update`. The skill folder holds `SKILL.md`, the house style
+and the command, `bin/excalive`, so the agent can run it with nothing on
+your PATH.
 
-Without Claude Code, clone it anywhere and run `bin/excalive`:
+Without an agent, clone the repository and run the command from the
+skill folder:
 
     git clone https://github.com/RafeSymonds/excalive
-    excalive/bin/excalive check excalive/examples/hello/story.md
+    excalive/skills/excalive/bin/excalive check excalive/examples/hello/story.md
 
 Then fetch the renderer once with `npx -y mcp-excalidraw-server status`.
 The first `video` run downloads Kokoro and its weights through uv, about
-330 MB. Nothing is installed system-wide. Put `bin/` on your PATH if you
-want to type `excalive` instead of its path.
+330 MB. In the commands below, `excalive` means that `bin/excalive`; put
+its folder on your PATH to type it that way.
 
 ## How a story works
 
@@ -163,7 +166,7 @@ shapes draw their outline and fill, text fades in. Removed ones fade out.
 Other front matter: `voice` and `speed` (Kokoro), `silent` (on-screen
 text the words need not say, per scene), `title` (size, color and font of
 the titles drawn above diagrams, Nunito by default), `text_x`, `intro`, `end_hold`, `gap`.
-`scripts/story.py` opens with the full list.
+`skills/excalive/scripts/story.py` opens with the full list.
 
 ## Commands
 
@@ -194,38 +197,37 @@ about three and a half minutes on an M-series Mac.
 ## With a coding agent
 
 The skill gives an agent the whole loop: draw, write, check,
-build, look at the contact sheets. [`docs/workflow.md`](docs/workflow.md)
+build, look at the contact sheets. [`workflow.md`](skills/excalive/references/workflow.md)
 says how to hand a batch of decks to agents one at a time, and what goes
 wrong when you do not. `excalive usage` measures what a run cost from
 its transcripts.
 
 ## Docs
 
-- [`docs/style.md`](docs/style.md): the house style. Page geometry,
+- [`style.md`](skills/excalive/references/style.md): the house style. Page geometry,
   fonts, colors, the kinds of slide with their JSON, measuring, diagrams,
   writing titles and list items, and the rules for a narrated video.
-- [`docs/workflow.md`](docs/workflow.md): a deck and its video, step by
+- [`workflow.md`](skills/excalive/references/workflow.md): a deck and its video, step by
   step, and how to run agents on it.
-- [`SKILL.md`](SKILL.md): the skill Claude Code loads.
-- `scripts/story.py` and `scripts/animate.mjs` open with their full
+- [`SKILL.md`](skills/excalive/SKILL.md): what the agent reads.
+- `skills/excalive/scripts/story.py` and `animate.mjs` open with their full
   reference: every front matter key and every storyboard field.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `bin/excalive` | The command |
-| `scripts/story.py` | Stories: checks, voices, slides, the storyboard (a uv script) |
-| `scripts/animate.mjs` | The renderer: keyframes to frames, frames to video, the checks |
-| `scripts/usage.py` | Transcript costs |
-| `assets/fonts/` | Nunito, which the headless renderer lacks |
-| `SKILL.md` | The Claude Code skill |
-| `examples/` | Three stories with their scenes |
-| `docs/` | Style and workflow |
+| `skills/excalive/` | The skill, which is everything `npx skills add` installs |
+| `skills/excalive/SKILL.md` | What the agent reads |
+| `skills/excalive/bin/excalive` | The command |
+| `skills/excalive/scripts/` | `story.py` (stories, checks, voices, slides), `animate.mjs` (the renderer), `usage.py` (transcript costs) |
+| `skills/excalive/assets/fonts/` | Nunito, which the headless renderer lacks |
+| `skills/excalive/references/` | The house style and the workflow |
+| `examples/` | Three stories with their scenes, previews and videos |
 
 ## Credits
 
 The renderer is mcp-excalidraw-server's (MIT), loaded at run time. Voices
 are Kokoro's (Apache 2.0), phonemized by misaki. Nunito is under the SIL
-Open Font License, in [`assets/fonts/OFL.txt`](assets/fonts/OFL.txt).
+Open Font License, in [`OFL.txt`](skills/excalive/assets/fonts/OFL.txt).
 excalive itself is MIT.

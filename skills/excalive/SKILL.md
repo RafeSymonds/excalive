@@ -12,22 +12,23 @@ house style before drawing anything.
 
 ## Where things are
 
-This skill's folder is the whole excalive checkout (cloned into
-`~/.claude/skills/excalive`, or a project's `.claude/skills/excalive`).
-From its base directory:
+The command ships inside this skill, so nothing needs to be on PATH. From
+this skill's base directory:
 
 | Path | What |
 |---|---|
-| `bin/excalive` | The command. Call it by this path, or put `bin/` on PATH. |
-| `docs/style.md` | House style: page, fonts, colors, slide kinds, card JSON, writing and narration rules. **Read before drawing a card or writing narration.** |
-| `docs/workflow.md` | The steps for a deck and its video, and how to hand the work to agents. |
-| `examples/` | Three complete stories (hello, dns, binary-search) to start from. |
+| `bin/excalive` | The command. Wherever this file says `excalive`, run `<skill dir>/bin/excalive`. |
+| `references/style.md` | House style: page, fonts, colors, slide kinds, card JSON, writing and narration rules. **Read before drawing a card or writing narration.** |
+| `references/workflow.md` | The steps for a deck and its video, and how to hand the work to agents. |
 | `scripts/story.py`, `scripts/animate.mjs` | Full reference in their opening comments: every front matter key and storyboard field. |
+
+Three complete example stories (hello, dns, binary-search) are in the
+repository's `examples/` folder, github.com/RafeSymonds/excalive.
 
 Needs `node`, `ffmpeg`, `uv`, and `mcp-excalidraw-server` 2.1 or later
 (`npx -y mcp-excalidraw-server status` fetches it once). The first `video`
-run downloads Kokoro, about 330 MB, through uv. To update, `git pull` in
-this folder.
+run downloads Kokoro, about 330 MB, through uv. Installed with
+`npx skills add RafeSymonds/excalive`; `npx skills update` updates it.
 
 ## Drawing scenes
 

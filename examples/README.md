@@ -3,7 +3,8 @@
 Three small projects. Each is one `story.md` that builds both a slide deck
 and a narrated video, and a `scenes` folder with the Excalidraw files and
 the `steps.json` that lists their build steps. Each folder also has the finished
-video. Run the commands from the repository root. Everything they write
+video. Run the commands from the repository root, where `excalive` is
+`skills/excalive/bin/excalive` (or the installed skill's `bin/excalive`). Everything they write
 goes to the example's `out/` folder, which git ignores.
 
     excalive check  examples/hello/story.md    # unspoken text and speech problems, no render
