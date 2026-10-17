@@ -19,6 +19,9 @@ and their build steps come from the steps.json beside them. A step is a
 list of the ids it shows, or another scene file ("search-2", or {"scene":
 "search-2", "ids": [...]}) whose elements that share ids with the step
 before move into place: that is how something moves within one slide.
+A step object may also carry "focus" (ids the camera moves in on, fitted
+to the area under the title, which stays put) and "set" ({id: settings},
+how those elements move in this step; see Effects in animate.mjs).
 
   excalive check  talk.md      scenes, steps, speech, unspoken text, overflow; no render
   excalive video  talk.md      voice every beat, then draw the video
@@ -38,6 +41,7 @@ Front matter (paths are relative to the story file):
   silent:  {scene: [ids]}            text the words need not say
   strict:  true                      video fails on unspoken text
   slides:  {file: deck/slides.md, images: deck/img, headmatter: {theme: ...}}
+  effects: [effects.mjs]             a story's own effects (see Effects in animate.mjs)
 
 The stages are cached. A beat's voice is kept by the hash of what it says,
 so editing one beat re-voices only that beat. The render always draws the
@@ -78,6 +82,9 @@ SENTENCE_END = re.compile(r'(?<=[.!?])\s+(?=[A-Z"\'(\[])')
 
 # Patterns that survive a read of the page but not a listen. "K2.5" is
 # read "K two five": the point is dropped.
+# Kokoro reads 1638 as a year ("sixteen thirty-eight"); 1,638 reads as a count.
+FOUR_DIGITS = re.compile(r'(?<![\d,.])(?!19\d\d\b|20\d\d\b)[1-9]\d{3}(?![\d,]|\.\d)')
+
 SPEECH_CHECKS = [
     (re.compile(r'\b[A-Z]{2,}-[A-Za-z]+'),
      'all-caps initialism + hyphen: the letters stop being read as letters'),
@@ -87,10 +94,16 @@ SPEECH_CHECKS = [
     (re.compile(r'\b\d+\s?M\b'), '"1M" is read "one em": spell out million'),
     (re.compile(r'https?://\S+'), 'bare URL: read letter by letter'),
     (re.compile(r'\b[A-Za-z]+\d+\.\d+\w*'), 'a version like K2.5 drops its point: add a lexicon entry'),
-    # Kokoro reads 1638 as a year ("sixteen thirty-eight"); 1,638 reads as a count.
-    (re.compile(r'(?<![\d,.])(?!19\d\d\b|20\d\d\b)[1-9]\d{3}(?![\d,]|\.\d)'),
-     'a four-digit count is read like a year: write it with a comma (1,638)'),
+    (FOUR_DIGITS, 'a four-digit count is read like a year: write it with a comma (1,638)'),
     (re.compile(r'\b\d{1,2}:00\b'), 'a :00 time is read "nine zero zero": write "9 PM"'),
+    # A video outlives the day it was made, and slides move or drop out of
+    # the video: words that lean on either go wrong without anyone noticing.
+    (re.compile(r'(?i)\b(?:tonight|tomorrow|yesterday|(?<!the )(?:next|last) time|'
+                r'(?<!the )(?:this|next|last) (?:morning|afternoon|evening|week|weekend|month|class|lecture|session))\b'),
+     'relative time: wrong once the video outlives its day; give the date or drop it'),
+    (re.compile(r'(?i)\b(?:(?:next|previous|last|earlier|following) slides?|'
+                r'slides? (?:ago|back|before|after|earlier|later)|\w+ slides? (?:ago|back|later|earlier|from now|away))\b'),
+     'points at another slide: breaks when slides move or drop out; name the thing'),
 ]
 
 
@@ -175,10 +188,19 @@ def resolve(story: Story, need_words=False):
                 # A step may name another scene file whose shared ids move into place.
                 entry = s['steps'][b['step']]
                 other = entry if isinstance(entry, str) else entry.get('scene') if isinstance(entry, dict) else None
+                shown = s['elements']
                 if other is not None:
                     of = s['file'].parent / (other if other.endswith('.excalidraw') else f'{other}.excalidraw')
                     if not of.exists():
                         problems.append(f'{name} {b["step"]}: step scene {of} not found')
+                        continue
+                    shown = json.loads(of.read_text())['elements']
+                if isinstance(entry, dict):
+                    problems += step_problems(f'{name} {b["step"]}', entry, other, shown)
+                    focus = set(entry.get('focus') or [])
+                    framed = [e for e in shown if e['id'] in focus or e.get('containerId') in focus]
+                    if framed:
+                        b['focus'] = bounds(framed)
         if need_words and not b['text']:
             problems.append(f'{name} {b["step"]}: no words')
     if problems:
@@ -194,14 +216,37 @@ def resolve(story: Story, need_words=False):
         title = next((b['title'] for b in run if b['title']), None)
         own = next((e for e in s['elements'] if e['id'] == 'title' and e['type'] == 'text'), None)
         drawn = None if own else title
+        camera, title_el = page(story, s['elements'], drawn, own)
+        # The title keeps its place on screen when a step's focus moves the
+        # camera: it is pinned under the scene's own camera.
+        pinned = ['title'] if own else ['story-title'] if title_el else []
+        # A scene that moves in on part of itself is clipped below the title,
+        # or what lies above its focus shows through behind the title.
+        clip = TITLE_CLIP if any(b.get('focus') for b in run) else None
         for j, b in enumerate(run):
             b['run_title'] = drawn
             b['name'] = title or (own['text'] if own else run[0]['scene'])
             b['first'] = j == 0
             b['last'] = j == len(run) - 1
             b['text_x'] = scene_text_x(story, run[0]['scene'], s['elements'])
-            b['camera'], b['title_el'] = page(story, s['elements'], drawn, own)
+            b['camera'] = focus_camera(b['focus']) if b.get('focus') else camera
+            b['title_el'] = title_el
+            b['pin'] = {'ids': pinned, 'camera': camera} if pinned else None
+            b['clip'] = clip
     return runs
+
+
+def step_problems(where: str, entry: dict, other, shown) -> list[str]:
+    """What is wrong with a step written as an object."""
+    problems = []
+    if other is None and not isinstance(entry.get('ids'), list):
+        problems.append(f'{where}: a step object needs "ids" or "scene"')
+    ids = {e['id'] for e in shown}
+    for key in ('focus', 'set'):
+        missing = [i for i in (entry.get(key) or []) if i not in ids]
+        if missing:
+            problems.append(f'{where}: "{key}" names {", ".join(missing)}, not in the step\'s scene')
+    return problems
 
 
 def scene_text_x(story: Story, scene: str, elements) -> str:
@@ -231,6 +276,8 @@ def scene_text_x(story: Story, scene: str, elements) -> str:
 PAGE_W, PAGE_H = 1600, 900
 TITLE_X, TITLE_Y = 120, 100
 CONTENT = (120, 220, 1360, 620)  # x, y, width, height of the area under the title
+# The page below the title (y 190 down), as fractions of the screen.
+TITLE_CLIP = {'x': 0, 'y': 190 / PAGE_H, 'width': 1, 'height': (PAGE_H - 190) / PAGE_H}
 
 
 def title_style(story: Story):
@@ -257,6 +304,21 @@ def page(story: Story, elements, title, own):
     return cam, {'id': 'story-title', 'type': 'text', 'x': cam['x'] + TITLE_X / s,
                  'y': cam['y'] + TITLE_Y / s, 'text': title, 'fontSize': size / s,
                  'fontFamily': font, 'strokeColor': color, 'textAlign': 'left'}
+
+
+# Page units kept clear between a step's focus and the edge of the content area.
+FOCUS_PAD = 40
+
+
+def focus_camera(box):
+    """A camera that fits `box` (x0, y0, x1, y1 in scene units) into the
+    content area under the title, centered: a step moving in on part of its
+    scene, the way the whole diagram is fitted there."""
+    x0, y0, x1, y1 = box
+    cx, cy, cw, ch = CONTENT
+    k = max((x1 - x0) / (cw - 2 * FOCUS_PAD), (y1 - y0) / (ch - 2 * FOCUS_PAD), 1e-6)
+    return {'x': (x0 + x1) / 2 - (cx + cw / 2) * k, 'y': (y0 + y1) / 2 - (cy + ch / 2) * k,
+            'width': PAGE_W * k, 'height': PAGE_H * k}
 
 
 def bounds(elements):
@@ -295,6 +357,10 @@ def storyboard(story: Story, runs, audio=None, names=False):
             k['step'] = b['step']
         if b['title_el']:
             k['add'] = [b['title_el']]
+        if b['pin']:
+            k['pin'] = b['pin']
+        if b['clip']:
+            k['clip'] = b['clip']
         if b['first'] and i:
             k['clear'] = True
         # The video opens on its first scene already drawn, so its first frame
@@ -316,6 +382,8 @@ def storyboard(story: Story, runs, audio=None, names=False):
                 story.opt('scene_gap', 1.0) if b['last'] else story.opt('gap', 0.5)
         keyframes.append(k)
     board = {'width': 1920, 'height': 1080, 'fps': 30, 'keyframes': keyframes}
+    if story.opt('effects'):
+        board['effects'] = [str(story.rel(f)) for f in story.opt('effects')]
     if story.opt('video'):
         board['output'] = str(story.rel(story.opt('video')))
     return board
@@ -416,12 +484,63 @@ def chunk(paragraphs: list[str]) -> list[str]:
     return chunks
 
 
-FOUR_DIGITS = SPEECH_CHECKS[-2][0]
-
-
 def spoken_text(text: str) -> str:
     """A beat's words minus its "Direction:" paragraphs, which no one says."""
     return '\n\n'.join(p for p in text.split('\n\n') if not p.strip().startswith('Direction:'))
+
+
+# Content words, compared by a rough stem, as animate.mjs compares what is
+# shown with what is said: "reading" meets "reads", "dropped" meets "drop",
+# and numbers written as words meet digits.
+NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+                'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen',
+                'nineteen', 'twenty']
+SMALL_WORDS = {'a', 'an', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'with', 'as',
+               'is', 'it', 'its', 'be', 'your', 'you', 'this', 'that'}
+
+
+def stem(word: str) -> str:
+    if word in NUMBER_WORDS:
+        return str(NUMBER_WORDS.index(word))
+    w = re.sub(r"'s$|'$", '', word)
+    if len(w) > 4 and w.endswith('ies'):
+        return w[:-3] + 'y'
+    if len(w) == 4 and re.search(r'[^s]s$', w):
+        return w[:-1]
+    if len(w) > 4:
+        cut = re.sub(r'(ing|ed|es|s)$', '', w)
+        w = cut[:-1] if cut != w and re.search(r'([^aeiou])\1$', cut) else cut
+    return re.sub(r'e$', '', w) if len(w) > 3 else w
+
+
+def content_stems(text: str) -> set[str]:
+    words = re.sub(r"[^a-z0-9']+", ' ', text.lower().replace('\u2019', "'").replace('\u2018', "'")).split()
+    return {stem(w) for w in words if w not in SMALL_WORDS}
+
+
+REPEAT_WORDS = 65           # about 25 seconds of speech
+
+
+def repeats(story: Story) -> list[str]:
+    """A sentence whose content words are mostly (80%) those of one said in
+    the last 25 seconds or so: the narration going round in a circle. Short
+    sentences are left alone: "Ask the example.com server" shares every word
+    with "It asks a root server: example.com?" and says something new."""
+    found, recent, said = [], [], 0
+    for b in story.beats:
+        for para in flatten(spoken_text(b['text'])):
+            for sentence in SENTENCE_END.split(para):
+                stems = content_stems(sentence)
+                recent = [r for r in recent if said - r[0] <= REPEAT_WORDS]
+                if len(stems) >= 6:
+                    for _, prior, pb, ptext in recent:
+                        if len(stems & prior) >= 0.8 * len(stems):
+                            found.append(f'{b["scene"]} {b["step"]}: "{sentence[:60]}" says again what '
+                                         f'{pb["scene"]} {pb["step"]} said ("{ptext[:60]}")')
+                            break
+                recent.append((said, stems, b, sentence))
+                said += len(sentence.split())
+    return found
 
 
 def lint(story: Story, lexicon: dict):
@@ -449,7 +568,10 @@ def lint(story: Story, lexicon: dict):
                 found.append(f'{b["scene"]} {b["step"]}: "{hit}": {problem}')
     for f in found:
         print(f'  speech: {f}')
-    return found
+    again = repeats(story)
+    for f in again:
+        print(f'  repeat: {f}')
+    return found + again
 
 
 def voice(story: Story, voice_name: str, speed: float):
@@ -505,6 +627,22 @@ def report_overflow(story: Story, result):
         print(f'  overflow: {b["scene"]} {b["step"]}: "{o["text"]}" {o["problem"]}')
 
 
+def report_counts(story: Story, result):
+    """A number said that disagrees with the same thing counted on screen."""
+    for c in result.get('counts', []):
+        b = story.beats[c['keyframe']]
+        print(f'  count: {b["scene"]} {b["step"]}: says {" or ".join(c["said"])} "{c["thing"]}", '
+              f'the screen shows {" or ".join(c["shown"])}')
+
+
+def report_small(story: Story, result):
+    """A screenshot whose own text will look too small to read."""
+    for m in result.get('small', []):
+        b = story.beats[m['keyframe']]
+        print(f'  small: {b["scene"]} {b["step"]}: the text in screenshot "{m["id"]}" looks about {m["px"]} px tall; '
+              f'focus on the part the words are about, or capture a smaller window')
+
+
 def report_titles(story: Story):
     """A title names its slide; anything that cues off slide titles needs
     each one once."""
@@ -523,6 +661,8 @@ def cmd_check(story: Story, args):
     report_titles(story)
     result = unspoken(story, runs)
     report_overflow(story, result)
+    report_counts(story, result)
+    report_small(story, result)
     n = report_unspoken(story, result)
     words = sum(len(b['text'].split()) for b in story.beats)
     print(f'{len(story.beats)} beats in {len(runs)} scenes, {words} words, '
@@ -538,6 +678,8 @@ def cmd_video(story: Story, args):
     strict = story.opt('strict', True)
     result = unspoken(story, runs)
     report_overflow(story, result)
+    report_counts(story, result)
+    report_small(story, result)
     if report_unspoken(story, result) and strict:
         fail('the words above are on screen but never said; say them, or list the ids under `silent`')
     v = args.voice or story.opt('voice', 'af_heart')
@@ -562,6 +704,8 @@ def cmd_slides(story: Story, args):
     report_titles(story)
     check = unspoken(story, runs)
     report_overflow(story, check)
+    report_counts(story, check)
+    report_small(story, check)
     if check.get('unspoken'):
         print('on-screen text the notes never say:')
         report_unspoken(story, check)

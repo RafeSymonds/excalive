@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 15px/1.4 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: #1f2933;
+    background: #eef1f5;
+  }
+  main {
+    width: 500px;
+    margin: 28px 0 0 32px;
+    padding: 20px 24px 24px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
+  }
+  h1 { margin: 0 0 14px; font-size: 22px; }
+  form { display: flex; gap: 8px; margin-bottom: 16px; }
+  input {
+    font: inherit;
+    padding: 7px 10px;
+    border: 1px solid #c5ccd6;
+    border-radius: 6px;
+  }
+  #name { flex: 1; }
+  #score { width: 90px; }
+  button {
+    font: inherit;
+    font-weight: 600;
+    padding: 7px 14px;
+    color: #fff;
+    background: #2563eb;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #6b7684;
+    padding: 0 8px 6px;
+    border-bottom: 1px solid #dfe3e8;
+  }
+  td { padding: 8px; border-bottom: 1px solid #eef0f3; }
+  td:first-child, th:first-child { width: 48px; color: #6b7684; }
+  td:last-child, th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Leaderboard</h1>
+  <form id="add">
+    <input id="name" placeholder="Player" required>
+    <input id="score" type="number" placeholder="Score" min="0" required>
+    <button>Add score</button>
+  </form>
+  <table>
+    <thead><tr><th>#</th><th>Player</th><th>Score</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+<script>
+const scores = [
+  { name: 'Lin', score: 92 },
+  { name: 'Ada', score: 87 },
+  { name: 'Sam', score: 64 },
+  { name: 'Kai', score: 41 },
+];
+const form = document.getElementById('add');
+const nameIn = document.getElementById('name');
+const scoreIn = document.getElementById('score');
+const tbody = document.getElementById('rows');
+
+const rowHtml = (r, i) =>
+  `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;
+
+function render() {
+  tbody.innerHTML = scores.map(rowHtml).join('');
+}
+
+function add(name, score) {
+  const row = scores.find(r => r.name === name);
+  if (!row) scores.push({ name, score });
+  else row.score = Math.max(row.score, score);
+  scores.sort((a, b) => b.score - a.score);
+  render();
+}
+
+form.onsubmit = e => {
+  e.preventDefault();
+  add(nameIn.value.trim(), Number(scoreIn.value));
+  form.reset();
+};
+
+render();
+</script>
+</body>
+</html>

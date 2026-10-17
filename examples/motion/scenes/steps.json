@@ -1,0 +1,23 @@
+{
+  "title-card": [
+    ["frame", "title", "series"]
+  ],
+  "request": [
+    ["frame", "browser", "browser-t", "server", "server-t", "handler", "db", "db-t", "row-n", "row-l"],
+    ["frame", "browser", "browser-t", "server", "server-t", "handler", "db", "db-t", "row-n", "row-l", "req", "req-t"],
+    ["frame", "browser", "browser-t", "server", "server-t", "handler", "db", "db-t", "row-n", "row-l", "req", "req-t", "q", "q-t"],
+    {"scene": "request-3", "ids": ["frame", "browser", "browser-t", "server", "server-t", "handler", "db", "db-t", "row-n", "row-l", "req", "req-t", "q", "q-t", "ring"], "focus": ["db"], "set": {"row-n": {"change": {"effect": "count", "delay": 1.0}}, "ring": {"delay": 1.6}}},
+    {"scene": "request-3", "ids": ["frame", "browser", "browser-t", "server", "server-t", "handler", "db", "db-t", "row-n", "row-l", "req", "req-t", "q", "q-t", "r", "r-t"]},
+    {"scene": "request-3", "ids": ["frame", "browser", "browser-t", "server", "server-t", "handler", "db", "db-t", "row-n", "row-l", "req", "req-t", "q", "q-t", "r", "r-t", "resp", "resp-t", "page-n", "page-l"]},
+    {"scene": "request-6", "ids": ["frame", "browser", "browser-t", "server", "server-t", "handler", "db", "db-t", "row-n", "row-l", "req", "req-t", "q", "q-t", "r", "r-t", "resp", "resp-t", "page-n", "page-l"], "set": {"row-n": {"change": {"effect": "count", "seconds": 2}}, "page-n": {"change": {"effect": "count", "seconds": 2}}}}
+  ],
+  "handler": [
+    ["frame", "title", "code-box", "code"],
+    ["frame", "title", "code-box", "code", "n0", "n0-a"],
+    ["frame", "title", "code-box", "code", "n0", "n0-a", "n1", "n1-a"],
+    ["frame", "title", "code-box", "code", "n0", "n0-a", "n1", "n1-a", "n2", "n2-a"]
+  ],
+  "end": [
+    ["frame", "title", "thanks"]
+  ]
+}

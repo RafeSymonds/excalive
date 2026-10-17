@@ -1,0 +1,312 @@
+{
+ "title-card": [
+  [
+   "frame",
+   "title",
+   "series"
+  ]
+ ],
+ "app": [
+  [
+   "frame",
+   "shot",
+   "outline"
+  ],
+  {
+   "scene": "app-2",
+   "ids": [
+    "frame",
+    "shot",
+    "outline",
+    "form",
+    "ring-new",
+    "new-t",
+    "new-a"
+   ],
+   "focus": [
+    "main",
+    "new-t"
+   ]
+  },
+  {
+   "scene": "app-3",
+   "ids": [
+    "frame",
+    "shot",
+    "outline",
+    "first",
+    "ring-first",
+    "first-t",
+    "first-a"
+   ],
+   "focus": [
+    "main",
+    "first-t"
+   ]
+  }
+ ],
+ "path": [
+  {
+   "ids": [
+    "frame",
+    "st1",
+    "l1",
+    "b1",
+    "c1"
+   ],
+   "focus": [
+    "st1"
+   ]
+  },
+  {
+   "ids": [
+    "frame",
+    "st1",
+    "l1",
+    "b1",
+    "c1",
+    "st2",
+    "l2",
+    "b2",
+    "c2",
+    "a1"
+   ],
+   "focus": [
+    "st2"
+   ]
+  },
+  {
+   "ids": [
+    "frame",
+    "st1",
+    "l1",
+    "b1",
+    "c1",
+    "st2",
+    "l2",
+    "b2",
+    "c2",
+    "a1",
+    "st3",
+    "l3",
+    "b3",
+    "c3",
+    "a2"
+   ],
+   "focus": [
+    "st3"
+   ]
+  },
+  {
+   "ids": [
+    "frame",
+    "st1",
+    "l1",
+    "b1",
+    "c1",
+    "st2",
+    "l2",
+    "b2",
+    "c2",
+    "a1",
+    "st3",
+    "l3",
+    "b3",
+    "c3",
+    "a2",
+    "st4",
+    "l4",
+    "b4",
+    "c4",
+    "a3"
+   ],
+   "focus": [
+    "st4"
+   ]
+  },
+  {
+   "ids": [
+    "frame",
+    "l1",
+    "b1",
+    "c1",
+    "l2",
+    "b2",
+    "c2",
+    "a1",
+    "l3",
+    "b3",
+    "c3",
+    "a2",
+    "l4",
+    "b4",
+    "c4",
+    "a3"
+   ]
+  }
+ ],
+ "sort": [
+  [
+   "frame",
+   "n-lin",
+   "b-lin",
+   "s-lin",
+   "n-ada",
+   "b-ada",
+   "s-ada",
+   "n-sam",
+   "b-sam",
+   "s-sam",
+   "n-kai",
+   "b-kai",
+   "s-kai",
+   "n-grace",
+   "b-grace",
+   "s-grace"
+  ],
+  [
+   "frame",
+   "n-lin",
+   "b-lin",
+   "s-lin",
+   "n-ada",
+   "b-ada",
+   "s-ada",
+   "n-sam",
+   "b-sam",
+   "s-sam",
+   "n-kai",
+   "b-kai",
+   "s-kai",
+   "n-grace",
+   "b-grace",
+   "s-grace",
+   "wrong-t",
+   "wrong-a"
+  ],
+  {
+   "scene": "sort-2",
+   "ids": [
+    "frame",
+    "n-lin",
+    "b-lin",
+    "s-lin",
+    "n-ada",
+    "b-ada",
+    "s-ada",
+    "n-sam",
+    "b-sam",
+    "s-sam",
+    "n-kai",
+    "b-kai",
+    "s-kai",
+    "n-grace",
+    "b-grace",
+    "s-grace"
+   ],
+   "set": {
+    "n-lin": {
+     "delay": 1.3
+    },
+    "b-lin": {
+     "delay": 1.3
+    },
+    "s-lin": {
+     "delay": 1.3
+    },
+    "n-ada": {
+     "delay": 1.3
+    },
+    "b-ada": {
+     "delay": 1.3
+    },
+    "s-ada": {
+     "delay": 1.3
+    },
+    "n-sam": {
+     "delay": 1.3
+    },
+    "b-sam": {
+     "delay": 1.3
+    },
+    "s-sam": {
+     "delay": 1.3
+    },
+    "n-kai": {
+     "delay": 1.3
+    },
+    "b-kai": {
+     "delay": 1.3
+    },
+    "s-kai": {
+     "delay": 1.3
+    },
+    "n-grace": {
+     "delay": 1.3
+    },
+    "b-grace": {
+     "delay": 1.3
+    },
+    "s-grace": {
+     "delay": 1.3
+    }
+   }
+  },
+  {
+   "scene": "sort-3",
+   "ids": [
+    "frame",
+    "n-lin",
+    "b-lin",
+    "s-lin",
+    "n-ada",
+    "b-ada",
+    "s-ada",
+    "n-sam",
+    "b-sam",
+    "s-sam",
+    "n-kai",
+    "b-kai",
+    "s-kai",
+    "n-grace",
+    "b-grace",
+    "s-grace"
+   ],
+   "set": {
+    "s-sam": {
+     "change": "count"
+    }
+   }
+  },
+  {
+   "scene": "sort-3",
+   "ids": [
+    "frame",
+    "n-lin",
+    "b-lin",
+    "s-lin",
+    "n-ada",
+    "b-ada",
+    "s-ada",
+    "n-sam",
+    "b-sam",
+    "s-sam",
+    "n-kai",
+    "b-kai",
+    "s-kai",
+    "n-grace",
+    "b-grace",
+    "s-grace",
+    "win-c",
+    "win-t"
+   ]
+  }
+ ],
+ "end": [
+  [
+   "frame",
+   "title",
+   "thanks"
+  ]
+ ]
+}

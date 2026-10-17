@@ -13,7 +13,8 @@
 //                                        content draws in and the camera moves to it
 //   excalive animate --snapshots demo-   every canvas snapshot named demo-*, oldest first
 //   excalive animate --steps scene.excalidraw   one keyframe per build step listed in
-//                                        the steps.json beside the file
+//                                        the steps.json beside the file (a step's "focus"
+//                                        moves the camera in, and the next step back out)
 //   excalive animate k1 k2 k3            keyframes: files, snapshot:<name>, or canvas
 //   excalive animate storyboard.json     full control (reference at the bottom of the script);
 //                                        keyframes can carry a voice track (`audio`) and
@@ -24,12 +25,13 @@
 //          --fps 30  --width 1920 --height 1080  --boil 8  --dark  --no-intro  --padding 60
 //          --text-x auto|left|center  --sheet sheet.png  --strict
 //          --stills <dir> (each keyframe's finished frame as a PNG)  --no-video (stills only)
+//          --effects a.mjs,b.mjs (modules of effects, as a story's `effects`)
 
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { execFileSync, spawnSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 // ---------------------------------------------------------------------------
 // Locate mcp-excalidraw-server's renderer. Its render modules are internal
@@ -376,6 +378,58 @@ function drawSubpaths(d, progress) {
   return out;
 }
 
+// Reveal a text element's lines left to right, one after another, each behind
+// a soft edge: a mask whose gradient fades out just past the pen. A line's
+// share of the time is its share of the characters. The mask sits in the
+// text's own coordinates, where each line is a <text> starting at x (or
+// centered on it) with its box from line * lineHeight down.
+let maskSerial = 0;
+function applyWriteProgress(body, progress, el) {
+  const lines = String(el.text).split('\n');
+  const size = el.fontSize;
+  const lineHeight = size * (el.lineHeight ?? 1.25);
+  const weights = lines.map(line => Math.max(1, line.replace(/\s/g, '').length));
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  const feather = size * 0.6;
+  let defs = '';
+  let done = 0;
+  let index = 0;
+  const out = body.replace(/<text\b([^>]*)>/g, (whole, attrs) => {
+    const n = index++;
+    const weight = weights[n] ?? 1;
+    const local = clamp01((progress * total - done) / weight);
+    done += weight;
+    if (local >= 1) return whole;
+    // Measured widths can fall a little short of the drawn glyphs.
+    const width = lineWidth(lines[n] ?? '', el.fontFamily, size) * 1.1 + size * 0.2;
+    const x = Number(attrs.match(/\sx="([^"]*)"/)?.[1] ?? 0);
+    const anchor = attrs.match(/\stext-anchor="([^"]*)"/)?.[1] ?? 'start';
+    const left = anchor === 'middle' ? x - width / 2 : anchor === 'end' ? x - width : x;
+    const pen = left + local * (width + feather);
+    const id = `excalive-write-${++maskSerial}`;
+    const box = `x="${left - size}" y="${n * lineHeight - size}" width="${width + size * 2}" height="${lineHeight + size * 2}"`;
+    defs += `<linearGradient id="${id}-edge" gradientUnits="userSpaceOnUse" x1="${pen - feather}" y1="0" x2="${pen}" y2="0">`
+      + '<stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>'
+      + `<mask id="${id}" maskUnits="userSpaceOnUse" ${box}><rect ${box} fill="url(#${id}-edge)"/></mask>`;
+    return `<text${attrs} mask="url(#${id})">`;
+  });
+  return `<defs>${defs}</defs>${out}`;
+}
+
+// A pinned element keeps its place on screen while the camera moves. Its
+// coordinates are where it sits under `_pin`, the camera it was laid out for,
+// so under another camera it moves and scales with that camera.
+function pinToCamera(el, camera) {
+  const { _pin: from, ...rest } = el;
+  const k = camera.width / from.width;
+  const out = { ...rest, x: camera.x + (el.x - from.x) * k, y: camera.y + (el.y - from.y) * k,
+    width: el.width * k, height: el.height * k };
+  if (typeof el.fontSize === 'number') out.fontSize = el.fontSize * k;
+  if (typeof el.strokeWidth === 'number') out.strokeWidth = el.strokeWidth * k;
+  if (Array.isArray(el.points)) out.points = el.points.map(([px, py]) => [px * k, py * k]);
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Scene loading
 
@@ -433,6 +487,7 @@ async function loadKeyframe(spec, baseDir) {
   let scene = await loadSceneSource(spec.scene, baseDir);
   let elements = scene.elements;
   let ids = spec.ids;
+  let focus, set;
   if (spec.step !== undefined) {
     if (typeof spec.scene !== 'string' || /^(canvas|snapshot:)/.test(spec.scene)) fail('"step" needs a scene file');
     const file = path.resolve(baseDir, spec.scene);
@@ -443,14 +498,23 @@ async function loadKeyframe(spec, baseDir) {
     // A step may show another scene file: "name" for all of it, or
     // {"scene": "name", "ids": [...]}. Elements that share an id with the
     // step before move, resize and recolor into place, which is how a step
-    // moves something.
+    // moves something. An object step may also carry "focus" (ids the camera
+    // fits) and "set" ({id: settings} for this step only).
     if (Array.isArray(entry)) {
       ids = entry;
-    } else {
+    } else if (typeof entry === 'string' || entry.scene) {
       const other = stepScenePath(stepsFile, typeof entry === 'string' ? entry : entry.scene);
       scene = await loadSceneSource(other, baseDir);
       elements = scene.elements;
       ids = typeof entry === 'string' ? undefined : entry.ids;
+    } else if (Array.isArray(entry.ids)) {
+      ids = entry.ids;
+    } else {
+      fail(`${stepsFile}: step ${spec.step} of ${sceneName(file)} needs "ids" or "scene"`);
+    }
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+      focus = entry.focus;
+      set = entry.set;
     }
   }
   if (ids) {
@@ -458,7 +522,7 @@ async function loadKeyframe(spec, baseDir) {
     elements = elements.filter(el => wanted.has(el.id) || (el.containerId && wanted.has(el.containerId)));
   }
   if (Array.isArray(spec.add)) elements = [...elements, ...spec.add];
-  return { elements, files: scene.files };
+  return { elements, files: scene.files, focus, set };
 }
 
 // New ids for every element and every reference to one, so nothing matches
@@ -522,7 +586,8 @@ function unspokenText(keyframes) {
   let shown = new Map();
   keyframes.forEach((k, i) => {
     if (k.spec.clear) shown = new Map();
-    const texts = k.elements.filter(el => el.type === 'text');
+    // Transient text counts in its own keyframe: it is on screen, if briefly.
+    const texts = k.all.filter(el => el.type === 'text');
     if (typeof k.spec.narration === 'string') {
       const said = new Set(spokenWords(k.spec.narration));
       const silent = new Set(k.spec.silent ?? []);
@@ -534,7 +599,106 @@ function unspokenText(keyframes) {
         }
       }
     }
-    shown = new Map(texts.map(el => [el.id, el.text]));
+    shown = new Map(k.elements.filter(el => el.type === 'text').map(el => [el.id, el.text]));
+  });
+  return out;
+}
+
+// A count the voice says that disagrees with the same thing counted on the
+// screen ("two servers" over "3 servers") reads as one of them being wrong.
+// A count pairs a number with the next two words that are not small words,
+// so "3 root servers" counts both roots and servers. Silent text is skipped.
+function countedThings(text) {
+  const words = String(text).toLowerCase().replace(/[‘’]/g, "'").match(/\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?|[a-z']+/g) ?? [];
+  const isNumber = w => /^\d/.test(w) || NUMBER_WORDS.includes(w);
+  const pairs = [];
+  words.forEach((word, i) => {
+    if (!isNumber(word) || word.includes('.')) return;
+    const n = /^\d/.test(word) ? word.replace(/,/g, '') : String(NUMBER_WORDS.indexOf(word));
+    const things = [];
+    for (const next of words.slice(i + 1)) {
+      if (things.length === 2 || isNumber(next)) break;
+      if (!SMALL_WORDS.has(next)) things.push(stem(next));
+    }
+    for (const thing of things) pairs.push([n, thing]);
+  });
+  return pairs;
+}
+
+function countMismatches(keyframes) {
+  const out = [];
+  keyframes.forEach((k, i) => {
+    if (typeof k.spec.narration !== 'string') return;
+    const silent = new Set(k.spec.silent ?? []);
+    const tally = (map, [n, thing]) => map.set(thing, (map.get(thing) ?? new Set()).add(n));
+    const shown = new Map();
+    for (const el of k.all) {
+      if (el.type !== 'text' || silent.has(el.id) || silent.has(el.containerId)) continue;
+      countedThings(el.originalText ?? el.text).forEach(pair => tally(shown, pair));
+    }
+    const said = new Map();
+    countedThings(k.spec.narration).forEach(pair => tally(said, pair));
+    for (const [thing, numbers] of said) {
+      const onScreen = shown.get(thing);
+      if (!onScreen || [...numbers].some(n => onScreen.has(n))) continue;
+      out.push({ keyframe: i, thing, said: [...numbers], shown: [...onScreen] });
+    }
+  });
+  return out;
+}
+
+// How tall a screenshot's own text looks on screen. The app's text is taken
+// as 13 CSS pixels, a common size for UI and body text; the capture holds
+// it at `scale` image pixels per CSS pixel (customData.excalive.scale, 2 if
+// not given: the house captures at 2x); and the step's camera draws each
+// image pixel at some number of screen pixels. Under 20 pixels of a 1080p
+// frame it is hard to read: zoom in on the part the words are about, or
+// capture a smaller window. Reported where a screenshot turns small, and
+// again after a step that showed it large.
+const UI_TEXT = 13;
+const SCREEN_TEXT_FLOOR = 20;
+const imageSizes = new Map();
+function imagePixels(dataURL) {
+  if (imageSizes.has(dataURL)) return imageSizes.get(dataURL);
+  const b = Buffer.from(String(dataURL).replace(/^data:[^,]*,/, ''), 'base64');
+  let size = null;
+  if (b.length > 24 && b.readUInt32BE(0) === 0x89504e47) size = [b.readUInt32BE(16), b.readUInt32BE(20)];
+  else if (b[0] === 0xff && b[1] === 0xd8) {
+    for (let i = 2; i + 9 < b.length;) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const marker = b[i + 1];
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+        size = [b.readUInt16BE(i + 7), b.readUInt16BE(i + 5)];
+        break;
+      }
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+  } else if (b.toString('latin1', 8, 12) === 'WEBP' && b.toString('latin1', 12, 16) === 'VP8X') {
+    size = [b.readUIntLE(24, 3) + 1, b.readUIntLE(27, 3) + 1];
+  }
+  imageSizes.set(dataURL, size);
+  return size;
+}
+
+function smallScreenText(keyframes, files, options) {
+  const out = [];
+  const said = new Map();
+  keyframes.forEach((k, i) => {
+    for (const el of k.elements) {
+      if (el.type !== 'image' || !files[el.fileId]) continue;
+      const pixels = imagePixels(files[el.fileId].dataURL);
+      if (!pixels) continue;
+      const scale = Number(el.customData?.excalive?.scale ?? 2);
+      const screenPerPixel = (el.width / pixels[0]) * (options.width / k.camera.width) * (1080 / options.height);
+      const px = Math.round(UI_TEXT * scale * screenPerPixel);
+      if (px >= SCREEN_TEXT_FLOOR) {
+        said.delete(el.id);
+        continue;
+      }
+      if (said.get(el.id) === px) continue;
+      said.set(el.id, px);
+      out.push({ keyframe: i, id: el.id, px });
+    }
   });
   return out;
 }
@@ -550,7 +714,7 @@ function overflowText(keyframes) {
     if (k.spec.clear) shown = new Map();
     const frame = k.elements.find(el => el.id === 'frame');
     const card = frame && Math.round(frame.width) === 1600 && Math.round(frame.height) === 900;
-    for (const el of k.elements) {
+    for (const el of k.all) {
       if (el.type !== 'text' || el.isDeleted || el.containerId || !frame || el.id === 'story-title') continue;
       if (shown.get(el.id) === el.text) continue;
       const raw = String(el.originalText ?? el.text);
@@ -749,20 +913,220 @@ function lerpRect(a, b, t) {
 }
 
 // ---------------------------------------------------------------------------
+// Effects
+//
+// An effect is how an element enters, changes or leaves during a transition:
+// an object with any of
+//   enter(el, t, ctx)     the element at progress t (0 to 1) of its entrance:
+//                         an element, a list of elements, or null for nothing
+//   exit(el, t, ctx)      the same as it leaves; without one, enter runs backwards
+//   change(a, b, t, ctx)  the element between its state before (a) and after (b)
+//   seconds(el, params)   how long it runs, when the default does not suit
+//   waitFor(params)       the id of an element whose entrance it waits for
+// An element an effect returns may carry `svg`, a function (body, element) ->
+// body that rewrites the element's own SVG, drawn as a layer of its own: that
+// is how draw traces an outline and write reveals a line. Every step rests on
+// its scene as drawn, so effects shape only the motion between steps.
+//
+// ctx holds ease (the easing function), params (the effect's settings),
+// seconds (how long this run lasts), element(id) (any element of the step),
+// unit (the box around the element and what moves with it: its label, its
+// group), pointAt(path, f) (the point a fraction f along an arrow or line),
+// textWidth(text, fontFamily, fontSize), effect(name), morph(a, b, t), lerp,
+// clamp01 and lerpColor.
+//
+// A story adds effects with `effects: [file.mjs]`. Each module's default
+// export is an object of named effects, which may replace built-in ones.
+
+const LINEAR_TYPES = new Set(['arrow', 'line', 'freedraw']);
+const OUTLINE_TYPES = new Set(['rectangle', 'ellipse', 'diamond']);
+const HAND_FONTS = new Set([1, 5]);   // Virgil, Excalifont
+
+// Hand-drawn text and code run at a steady pace, so a short label does not
+// crawl and a long one speeds up to finish within the cap.
+const WRITE_PACE = { perSecond: 30, min: 0.4, max: 1.6 };
+const TYPE_PACE = { perSecond: 60, min: 0.3, max: 2.5 };
+function paced(el, pace) {
+  if (el.type !== 'text') return undefined;
+  const chars = String(el.originalText ?? el.text).replace(/\s/g, '').length;
+  return Math.min(pace.max, Math.max(pace.min, chars / pace.perSecond));
+}
+
+const fadeIn = (el, t, ctx) => ({ ...el, opacity: (el.opacity ?? 100) * ctx.ease(t) });
+
+const EFFECTS = {
+  none: { enter: (el, t) => (t > 0 ? el : null), exit: (el, t) => (t < 1 ? el : null) },
+  fade: { enter: fadeIn },
+  rise: {
+    enter(el, t, ctx) {
+      const e = ctx.ease(t);
+      return { ...el, opacity: (el.opacity ?? 100) * e, y: el.y + (1 - e) * 16 };
+    },
+  },
+  pop: {
+    enter(el, t) {
+      const s = 0.6 + 0.4 * EASINGS.outBack(t);
+      const out = { ...el, opacity: (el.opacity ?? 100) * clamp01(t * 3) };
+      if (el.containerId || el.type === 'text') return out;
+      out.x = el.x + (el.width * (1 - s)) / 2;
+      out.y = el.y + (el.height * (1 - s)) / 2;
+      out.width = el.width * s;
+      out.height = el.height * s;
+      if (Array.isArray(el.points)) out.points = el.points.map(([px, py]) => [px * s, py * s]);
+      return out;
+    },
+  },
+  // Text appears a character at a time, as typed.
+  type: {
+    enter(el, t, ctx) {
+      if (el.type !== 'text') return fadeIn(el, t, ctx);
+      const full = el.originalText ?? el.text;
+      const shown = full.slice(0, Math.round(full.length * t));
+      return shown ? { ...el, text: shown, originalText: shown } : null;
+    },
+    seconds: el => paced(el, TYPE_PACE),
+  },
+  // Each line is revealed left to right behind a soft edge, one line after
+  // another: hand-drawn text writing itself on.
+  write: {
+    enter(el, t, ctx) {
+      if (el.type !== 'text') return fadeIn(el, t, ctx);
+      if (t <= 0) return null;
+      return t >= 1 ? el : { ...el, svg: (body, drawn) => applyWriteProgress(body, t, drawn) };
+    },
+    seconds: el => paced(el, WRITE_PACE),
+  },
+  // Arrows and lines grow along their path; shapes trace their outline, then fill.
+  draw: {
+    enter(el, t, ctx) {
+      if (t <= 0) return null;
+      if (LINEAR_TYPES.has(el.type)) {
+        const drawn = { ...el, points: truncatePath(el.points, ctx.ease(t)), startBinding: null, endBinding: null };
+        if (t < 1) drawn.elbowed = false;
+        return drawn;
+      }
+      if (OUTLINE_TYPES.has(el.type)) {
+        if (t >= 1) return el;
+        // The outline draws on over the first 75%; the fill fades in from 45%.
+        const stroke = EASINGS.inOutCubic(clamp01(t / 0.75));
+        const fill = clamp01((t - 0.45) / 0.55);
+        return { ...el, svg: (body, drawn) => applyDrawProgress(body, { stroke, fill }, drawn.strokeColor) };
+      }
+      return fadeIn(el, t, ctx);
+    },
+  },
+  // Moves along an arrow or line (`path`, its id) and arrives at its end: a
+  // message on its way. Meant for a transient element, a dot or a label, which
+  // then fades where it arrived. It waits for its path to finish drawing.
+  travel: {
+    enter(el, t, ctx) {
+      const path = ctx.element(ctx.params.path);
+      if (!path || !Array.isArray(path.points)) fail(`travel on "${el.id}" needs "path": the id of an arrow or line in the same step`);
+      const [px, py] = ctx.pointAt(path, ctx.ease(t));
+      const u = ctx.unit;
+      return {
+        ...el, x: el.x + px - (u.x + u.width / 2), y: el.y + py - (u.y + u.height / 2),
+        opacity: (el.opacity ?? 100) * clamp01(t * 5),
+      };
+    },
+    seconds: () => 0.9,
+    waitFor: params => params.path,
+  },
+  morph: { change: (a, b, t, ctx) => morphElement(a, b, ctx.ease(t)) },
+};
+
+// The house entrance by kind: shapes trace, arrows grow, hand-drawn text
+// writes on, code types, and plain type (Nunito and the rest) fades in.
+function defaultEnter(el) {
+  if (LINEAR_TYPES.has(el.type) || OUTLINE_TYPES.has(el.type)) return 'draw';
+  if (el.type === 'text' && HAND_FONTS.has(Number(el.fontFamily))) return 'write';
+  if (el.type === 'text' && CODE_FONTS.has(Number(el.fontFamily))) return 'type';
+  return 'fade';
+}
+
+const effectSpec = value => (typeof value === 'string' ? { effect: value } : value && typeof value === 'object' ? value : null);
+
+function getEffect(name, hook) {
+  const fx = EFFECTS[name];
+  if (!fx) fail(`unknown effect "${name}" (have ${Object.keys(EFFECTS).join(', ')})`);
+  if (hook === 'change' ? !fx.change : !fx.enter && !fx.exit) fail(`effect "${name}" cannot ${hook}`);
+  return fx;
+}
+
+async function loadEffects(files, baseDir) {
+  for (const file of files ?? []) {
+    const mod = await import(pathToFileURL(path.resolve(baseDir, file)).href);
+    const named = mod.default ?? mod.effects;
+    if (!named || typeof named !== 'object') fail(`${file}: export default an object of named effects`);
+    Object.assign(EFFECTS, named);
+  }
+}
+
+// The point a fraction f of the way along an arrow's or line's path.
+function pointAt(path, f) {
+  const points = truncatePath(path.points, clamp01(f));
+  const [px, py] = points[points.length - 1];
+  return [path.x + px, path.y + py];
+}
+
+// ---------------------------------------------------------------------------
+// Element settings, from Excalidraw's own customData field, which the editor
+// keeps and which travels with the element from step to step:
+//   "customData": {"excalive": {
+//     "enter": "write",          an effect, or {"effect": "travel", "path": "q1"}
+//     "exit": "fade", "change": "morph",
+//     "delay": 0.2,              seconds after its turn in the entrance order
+//     "seconds": 0.8,            how long its entrance or change runs
+//     "easing": "outCubic",
+//     "transient": true,         only in its step's transition: it enters, then
+//                                leaves (a number: seconds to stay first)
+//     "pin": true                keeps its place on screen while the camera moves
+//   }}
+// Timing keys inside an effect object override these. A keyframe's `set`
+// ({id: settings}, from a step's "set" in steps.json) overrides them for that
+// step. A shape's settings reach its bound label, and the members of a group
+// share theirs.
+
+function ownSettings(el) {
+  const s = el.customData?.excalive;
+  return s && typeof s === 'object' ? s : {};
+}
+
+function settingsFor(elements, set = {}) {
+  const byId = new Map(elements.map(el => [el.id, el]));
+  const own = el => ({ ...ownSettings(el), ...(set[el.id] ?? {}) });
+  const keyOf = el => unitKey(el.containerId ? byId.get(el.containerId) ?? el : el);
+  const shared = new Map();
+  for (const el of elements) {
+    if (el.containerId) continue;
+    shared.set(keyOf(el), { ...(shared.get(keyOf(el)) ?? {}), ...own(el) });
+  }
+  return new Map(elements.map(el => [el.id, { ...(shared.get(keyOf(el)) ?? {}), ...own(el) }]));
+}
+
+const isTransient = settings => settings?.transient !== undefined && settings.transient !== false;
+
+// A keyframe ready to plan: its settings, every element in scene order, the
+// ones that rest on screen, and the transient ones that only pass through its
+// transition. Pinned elements carry the camera they were laid out under.
+function finishKeyframe(spec, all) {
+  const settings = settingsFor(all, spec.set);
+  const pinned = new Set(spec.pin?.ids ?? []);
+  const marked = all.map(el => (pinned.has(el.id) || settings.get(el.id)?.pin ? { ...el, _pin: spec.pin?.camera ?? true } : el));
+  return {
+    spec, settings, all: marked,
+    elements: marked.filter(el => !isTransient(settings.get(el.id))),
+    transients: marked.filter(el => isTransient(settings.get(el.id))),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Transitions
 
 // Seconds per transition when a keyframe sets no duration.
 const DEFAULT_DURATION = 1.2;
-
-const LINEAR_TYPES = new Set(['arrow', 'line', 'freedraw']);
-const OUTLINE_TYPES = new Set(['rectangle', 'ellipse', 'diamond']);
-
-function defaultEnterStyle(el) {
-  if (LINEAR_TYPES.has(el.type)) return 'draw';
-  if (OUTLINE_TYPES.has(el.type)) return 'draw';
-  if (el.type === 'text') return 'fade';
-  return 'fade';
-}
+// Seconds a transient element takes to leave, unless its exit says otherwise.
+const TRANSIENT_EXIT = 0.4;
 
 // Elements that enter together: a shape with its label, or one Excalidraw group.
 function unitKey(el) {
@@ -835,111 +1199,147 @@ function morphElement(a, b, t) {
   return out;
 }
 
-// One entering element at progress p (0..1) of its own enter window.
-function enterElement(el, style, p, ease) {
-  const e = ease(p);
-  const opacity = el.opacity ?? 100;
-  if (style === 'none') return p > 0 ? [el] : [];
-  if (style === 'fade') return [{ ...el, opacity: opacity * e }];
-  if (style === 'rise') return [{ ...el, opacity: opacity * e, y: el.y + (1 - e) * 16 }];
-  if (style === 'pop') {
-    const s = 0.6 + 0.4 * EASINGS.outBack(p);
-    const out = { ...el, opacity: opacity * clamp01(p * 3) };
-    if (el.containerId || el.type === 'text') return [out];
-    out.x = el.x + (el.width * (1 - s)) / 2;
-    out.y = el.y + (el.height * (1 - s)) / 2;
-    out.width = el.width * s;
-    out.height = el.height * s;
-    if (Array.isArray(el.points)) out.points = el.points.map(([px, py]) => [px * s, py * s]);
-    return [out];
-  }
-  if (style === 'type' && el.type === 'text') {
-    const full = el.originalText ?? el.text;
-    const shown = full.slice(0, Math.round(full.length * p));
-    return shown ? [{ ...el, text: shown, originalText: shown }] : [];
-  }
-  if (style === 'draw' && LINEAR_TYPES.has(el.type)) {
-    if (p <= 0) return [];
-    const drawn = { ...el, points: truncatePath(el.points, e), startBinding: null, endBinding: null };
-    if (p < 1) drawn.elbowed = false;
-    return [drawn];
-  }
-  if (style === 'draw' && OUTLINE_TYPES.has(el.type)) {
-    // The outline draws on over the first 75%; the fill fades in from 45%.
-    // renderFrame applies `_draw` to the shape's own SVG paths.
-    if (p <= 0) return [];
-    const stroke = EASINGS.inOutCubic(clamp01(p / 0.75));
-    const fill = clamp01((p - 0.45) / 0.55);
-    return [{ ...el, _draw: { stroke, fill } }];
-  }
-  // Labels and other elements without a dedicated style fade in.
-  return [{ ...el, opacity: opacity * e }];
-}
-
 // Bookkeeping fields change on every save without changing the picture.
 const BOOKKEEPING_KEYS = new Set(['version', 'versionNonce', 'updated', 'index']);
 function visualKey(el) {
   return JSON.stringify(el, (key, value) => (BOOKKEEPING_KEYS.has(key) ? undefined : value));
 }
 
-// Plan one transition: when each element starts and how long it runs.
-function planTransition(fromEls, toEls, spec) {
-  const from = new Map(fromEls.map(el => [el.id, el]));
-  const to = new Map(toEls.map(el => [el.id, el]));
-  const entering = toEls.filter(el => !from.has(el.id));
-  const exiting = fromEls.filter(el => !to.has(el.id));
-  const morphing = toEls.filter(el => from.has(el.id) && visualKey(from.get(el.id)) !== visualKey(el));
+// Plan one transition: for each element that moves, which effect runs, when
+// it starts and how long it lasts. `previous` is the keyframe before, whose
+// settings say how its elements leave.
+function planTransition(k, previous) {
+  const { spec } = k;
+  const from = new Map(k.from.map(el => [el.id, el]));
+  const to = new Map(k.all.map(el => [el.id, el]));
+  const entering = k.all.filter(el => !from.has(el.id));
+  const exiting = k.from.filter(el => !to.has(el.id));
+  const changing = k.all.filter(el => from.has(el.id) && visualKey(from.get(el.id)) !== visualKey(el));
   const duration = spec.duration ?? DEFAULT_DURATION;
   // Every phase scales with `duration`, so a longer duration slows the whole
   // transition rather than only the morphs.
   const enterDuration = spec.enterDuration ?? Math.max(0.4, duration * 0.8);
-  const busy = exiting.length > 0 || morphing.length > 0;
+  const busy = exiting.length > 0 || changing.length > 0;
   const exitDuration = busy ? duration * 0.55 : 0;
   // After a `clear` the camera cuts once the old scene is gone, so nothing new
   // may start drawing before then.
   const enterStart = spec.enterDelay ?? (spec.clear ? exitDuration : busy ? duration * 0.45 : 0);
-  const units = orderUnits(entering, spec.order);
-  // 0.2s between elements, squeezed so a big scene still enters within ~3s.
+  // Pinned elements (a slide's title) enter first: they say what the page is
+  // before anything draws on it.
+  const ordered = orderUnits(entering, spec.order);
+  const units = [...ordered.filter(u => u.some(el => el._pin)), ...ordered.filter(u => !u.some(el => el._pin))];
+  // 0.2s between units, squeezed so a big scene still enters within ~3s.
   const stagger = spec.stagger ?? (units.length > 1 ? Math.min(0.2, 3 / (units.length - 1)) : 0);
-  const timing = new Map();
+
+  // One effect run. Timing keys in the effect object win over the element's
+  // settings, which win over the effect's own length and the default.
+  const job = (el, hook, fxSpec, settings, start, fallback) => {
+    const fx = getEffect(fxSpec.effect, hook);
+    const easeName = fxSpec.easing ?? settings.easing;
+    const length = fxSpec.seconds ?? settings.seconds ?? fx.seconds?.(el, fxSpec) ?? fallback;
+    return {
+      hook, fx, params: fxSpec, ease: easeName ? easing(easeName) : null,
+      start: start + (fxSpec.delay ?? settings.delay ?? 0), length,
+    };
+  };
+
+  const runs = new Map();
   units.forEach((members, i) => {
-    const start = enterStart + i * stagger;
+    const slot = enterStart + i * stagger;
     for (const el of members) {
-      // A shape's label appears as its outline finishes.
-      const isLabel = Boolean(el.containerId);
-      const style = spec.styles?.[el.id] ?? (isLabel ? 'fade' : spec.enter && spec.enter !== 'auto' ? spec.enter : defaultEnterStyle(el));
-      timing.set(el.id, {
-        start: isLabel ? start + enterDuration * 0.5 : start,
-        length: isLabel ? enterDuration * 0.5 : enterDuration,
-        style,
-      });
+      const settings = k.settings.get(el.id) ?? {};
+      const asked = effectSpec(spec.styles?.[el.id]) ?? effectSpec(settings.enter)
+        ?? (spec.enter && spec.enter !== 'auto' ? effectSpec(spec.enter) : null);
+      // A shape's label appears as its outline finishes, unless told otherwise.
+      const waits = Boolean(el.containerId) && !asked;
+      const fxSpec = { effect: defaultEnter(el), ...(asked ?? {}) };
+      const run = job(el, 'enter', fxSpec, settings, waits ? slot + enterDuration * 0.5 : slot, waits ? enterDuration * 0.5 : enterDuration);
+      if (isTransient(settings)) run.transient = settings;
+      runs.set(el.id, run);
     }
   });
-  const enterEnd = units.length ? enterStart + (units.length - 1) * stagger + enterDuration : 0;
-  const total = Math.max(busy ? duration : 0, enterEnd, exitDuration);
-  return { from, to, timing, exitDuration, total, morphDuration: morphing.length ? duration : 0 };
+  // Runs that wait for another element's entrance (travel waits for its path).
+  for (const run of runs.values()) {
+    const before = runs.get(run.fx.waitFor?.(run.params));
+    if (before && before !== run) run.start = Math.max(run.start, before.start + before.length);
+  }
+  for (const [id, run] of runs) {
+    if (!run.transient) continue;
+    const stay = typeof run.transient.transient === 'number' ? run.transient.transient : 0;
+    run.then = job(to.get(id), 'exit', { effect: 'fade', ...(effectSpec(run.transient.exit) ?? {}) }, {}, run.start + run.length + stay, TRANSIENT_EXIT);
+  }
+  for (const el of changing) {
+    const settings = k.settings.get(el.id) ?? {};
+    runs.set(el.id, job(el, 'change', { effect: 'morph', ...(effectSpec(settings.change) ?? {}) }, settings, 0, duration));
+  }
+  for (const el of exiting) {
+    // How an element leaves is its own business, from the step it was in.
+    const settings = { ...(previous?.settings?.get(el.id.replace(/::was$/, '')) ?? {}), ...(spec.set?.[el.id] ?? {}) };
+    runs.set(el.id, job(el, 'exit', { effect: 'fade', ...(effectSpec(settings.exit) ?? {}) }, {}, 0, exitDuration));
+  }
+
+  let total = busy ? duration : 0;
+  for (const run of runs.values()) {
+    total = Math.max(total, run.start + run.length, run.then ? run.then.start + run.then.length : 0);
+  }
+  const unitBoxes = new Map(units.map(members => [unitKey(members[0]), boundsOf(members)]));
+  return { from, to, runs, exitDuration, total, unitBoxes };
+}
+
+const asList = value => (value == null ? [] : Array.isArray(value) ? value : [value]);
+
+function effectContext(run, plan, ease, el) {
+  return {
+    ease: run.ease ?? ease,
+    params: run.params,
+    seconds: run.length,
+    element: id => plan.to.get(id) ?? plan.from.get(id),
+    unit: plan.unitBoxes.get(unitKey(el)) ?? boundsOf([el]),
+    pointAt,
+    textWidth,
+    effect: name => getEffect(name, 'enter'),
+    morph: morphElement,
+    lerp, clamp01, lerpColor,
+  };
+}
+
+function leave(run, el, t, ctx) {
+  return asList(run.fx.exit ? run.fx.exit(el, t, ctx) : run.fx.enter(el, 1 - t, ctx));
 }
 
 // Elements on screen at time `time` (seconds) into a planned transition.
-function sampleTransition(plan, toEls, fromEls, time, ease) {
+function sampleTransition(plan, k, time, ease) {
   const out = [];
-  // Exiting elements keep their original z-order slot by staying in front of
-  // nothing in particular: draw them first so entering content covers them.
-  for (const el of fromEls) {
+  // Leaving elements are drawn first, so what enters covers them.
+  for (const el of k.from) {
     if (plan.to.has(el.id)) continue;
-    const p = windowProgress(time, 0, plan.exitDuration);
-    if (p < 1) out.push({ ...el, opacity: (el.opacity ?? 100) * (1 - ease(p)) });
+    const run = plan.runs.get(el.id);
+    const p = windowProgress(time, run.start, run.length);
+    if (p < 1) out.push(...leave(run, el, p, effectContext(run, plan, ease, el)));
   }
-  const morphT = ease(windowProgress(time, 0, plan.morphDuration));
-  for (const el of toEls) {
-    const before = plan.from.get(el.id);
-    if (before) {
-      out.push(morphElement(before, el, morphT));
+  for (const el of k.all) {
+    const run = plan.runs.get(el.id);
+    if (!run) {
+      out.push(el);
       continue;
     }
-    const { start, length, style } = plan.timing.get(el.id);
-    const p = windowProgress(time, start, length);
-    if (p > 0) out.push(...enterElement(el, style, p, ease));
+    const p = windowProgress(time, run.start, run.length);
+    if (run.hook === 'change') {
+      const before = plan.from.get(el.id);
+      out.push(...asList(p <= 0 ? before : p >= 1 ? el : run.fx.change(before, el, p, effectContext(run, plan, ease, el))));
+      continue;
+    }
+    if (p <= 0) continue;
+    if (run.then && time >= run.then.start) {
+      // A transient element leaves from where its entrance left it.
+      const q = windowProgress(time, run.then.start, run.then.length);
+      if (q >= 1) continue;
+      for (const arrived of asList(run.fx.enter(el, 1, effectContext(run, plan, ease, el)))) {
+        out.push(...leave(run.then, arrived, q, effectContext(run.then, plan, ease, arrived)));
+      }
+      continue;
+    }
+    out.push(...asList(run.fx.enter(el, p, effectContext(run, plan, ease, el))));
   }
   return out;
 }
@@ -953,13 +1353,19 @@ function hashSeed(text) {
   return ((h >>> 0) % 2147483646) + 1;
 }
 
-async function renderFrame(elements, camera, options, boilTick) {
-  const seeded = boilTick === null ? elements : elements.map(el => ({ ...el, seed: hashSeed(`${el.id}:${boilTick}`) }));
-  const drawing = new Map();
+// `clip` ({x, y, width, height} as fractions of the screen) hides what lies
+// outside it, except pinned elements: a scene moving in on part of itself
+// keeps clear of the title above it.
+async function renderFrame(elements, camera, options, boilTick, clip = null) {
+  const pins = new Set(elements.filter(el => el._pin).map(el => el.id));
+  const placed = elements.map(el => (el._pin ? pinToCamera(el, camera) : el));
+  const seeded = boilTick === null ? placed : placed.map(el => ({ ...el, seed: hashSeed(`${el.id}:${boilTick}`) }));
+  // An element an effect gave an `svg` rewrite is drawn as a layer of its own.
+  const rewrites = new Map();
   const plain = seeded.map(el => {
-    if (!el._draw) return el;
-    const { _draw, ...rest } = el;
-    drawing.set(el.id, _draw);
+    if (typeof el.svg !== 'function') return el;
+    const { svg, ...rest } = el;
+    rewrites.set(el.id, svg);
     return rest;
   });
   const live = await prepareScene(plain);
@@ -972,18 +1378,19 @@ async function renderFrame(elements, camera, options, boilTick) {
     exportingFrame: frame,
   });
 
-  // Shapes being drawn on render as their own layer so their paths can be
+  // Elements with a rewrite render as their own layer so their SVG can be
   // edited. Layers keep scene order, and the same camera frame gives every
   // layer the same coordinate system, so the bodies stack into one SVG.
   const layers = [];
   for (const el of live) {
-    const draw = drawing.get(el.id);
+    const rewrite = rewrites.get(el.id);
+    const pinned = pins.has(el.id);
     const last = layers[layers.length - 1];
-    if (draw) layers.push({ elements: [el], draw, strokeColor: el.strokeColor });
-    else if (last && !last.draw) last.elements.push(el);
-    else layers.push({ elements: [el], draw: null });
+    if (rewrite || (clip && pinned)) layers.push({ elements: [el], rewrite, pinned });
+    else if (last && !last.rewrite && !last.pinned) last.elements.push(el);
+    else layers.push({ elements: [el], rewrite: null, pinned: false });
   }
-  if (layers.length === 0) layers.push({ elements: [], draw: null });
+  if (layers.length === 0) layers.push({ elements: [], rewrite: null, pinned: false });
   let head = '';
   const bodies = [];
   for (const [i, layer] of layers.entries()) {
@@ -991,9 +1398,15 @@ async function renderFrame(elements, camera, options, boilTick) {
     const open = layerSvg.match(/^<svg[^>]*>/)[0];
     if (i === 0) head = open;
     const body = layerSvg.slice(open.length, layerSvg.lastIndexOf('</svg>'));
-    bodies.push(layer.draw ? applyDrawProgress(body, layer.draw, layer.strokeColor) : body);
+    const drawn = layer.rewrite ? layer.rewrite(body, layer.elements[0]) : body;
+    bodies.push(clip && !layer.pinned ? `<g clip-path="url(#excalive-clip)">${drawn}</g>` : drawn);
   }
-  let svg = `${head}${bodies.join('')}</svg>`;
+  // The clip is in the SVG's own units: scene units from the camera's corner.
+  // The background goes under everything, since the first layer's is clipped.
+  const under = clip ? `<rect x="0" y="0" width="${camera.width}" height="${camera.height}" fill="${options.background}"/>`
+    + `<clipPath id="excalive-clip"><rect x="${clip.x * camera.width}" y="${clip.y * camera.height}" `
+    + `width="${clip.width * camera.width}" height="${clip.height * camera.height}"/></clipPath>` : '';
+  let svg = `${head}${under}${bodies.join('')}</svg>`;
   const entries = fonts.collectFontEntriesFromSvg(svg);
   // The renderer has no Nunito (Excalidraw's "Normal" font) and draws it as
   // Liberation Sans. This skill carries a Nunito TTF, so keep the family
@@ -1154,6 +1567,7 @@ async function buildStoryboard(positionals, flags) {
   }
   return {
     board: {
+      effects: flags.effects ? flags.effects.split(',') : undefined,
       output: firstFile ? `${sceneName(firstFile)}.mp4` : undefined,
       keyframes: keyframes.map((k, i) => ({ ...k, duration: i === 0 && flags['no-intro'] ? 0 : duration, hold })),
     },
@@ -1240,43 +1654,63 @@ async function main() {
   const ease = easing(board.easing);
 
   const textX = flags['text-x'] ?? board.textX ?? 'auto';
+  await loadEffects(board.effects, baseDir);
   let keyframes = [];
   if (flags.frames) {
     const scene = await loadSceneSource(positionals[0] ?? 'canvas', baseDir);
     Object.assign(options.files, scene.files);
-    keyframes = frameKeyframes(await normalizeKeyframe(expandShorthand(scene.elements), textX), flags);
+    keyframes = frameKeyframes(await normalizeKeyframe(expandShorthand(scene.elements), textX), flags)
+      .map(k => finishKeyframe(k.spec, k.elements));
   } else {
     for (const spec of board.keyframes) {
       const scene = await loadKeyframe(spec, baseDir);
       Object.assign(options.files, scene.files);
       const elements = await normalizeKeyframe(expandShorthand(scene.elements), spec.textX ?? textX);
-      keyframes.push({ spec, elements });
+      // A step's "focus" becomes the camera, unless the keyframe brings its own
+      // (excalive video and slides fit the focus into the page themselves).
+      const camera = spec.camera ?? (scene.focus ? { fit: scene.focus } : undefined);
+      const k = finishKeyframe({ ...spec, camera, set: { ...(scene.set ?? {}), ...(spec.set ?? {}) } }, elements);
+      k.focused = !spec.camera && Boolean(scene.focus);
+      keyframes.push(k);
     }
   }
 
   // Default camera frames everything any keyframe shows; keyframes may
-  // override it and later keyframes inherit the last camera.
-  const everything = fitAspect(boundsOf(keyframes.flatMap(k => k.elements)), aspect, options.padding);
-  let camera = board.camera ? resolveCamera(board.camera, keyframes.flatMap(k => k.elements), aspect, options.padding) : everything;
+  // override it and later keyframes inherit the last camera, except that a
+  // step's focus ends with its step: the camera goes back to the default.
+  // Pinned elements sit in screen terms and do not count toward a fit.
+  const framed = els => els.filter(el => !el._pin);
+  const everything = fitAspect(boundsOf(framed(keyframes.flatMap(k => k.all))), aspect, options.padding);
+  const base = board.camera ? resolveCamera(board.camera, framed(keyframes.flatMap(k => k.all)), aspect, options.padding) : everything;
+  let camera = base;
+  let focused = false;
   for (const k of keyframes) {
     // A cleared keyframe is a new scene, so it frames itself rather than
     // keep the camera of the scene it replaced.
-    const own = k.spec.clear ? fitAspect(boundsOf(k.elements), aspect, options.padding) : camera;
-    k.camera = resolveCamera(k.spec.camera, k.elements, aspect, options.padding) ?? own;
+    const own = k.spec.clear ? fitAspect(boundsOf(framed(k.all)), aspect, options.padding) : focused ? base : camera;
+    k.camera = resolveCamera(k.spec.camera, framed(k.all), aspect, options.padding) ?? own;
     camera = k.camera;
+    focused = Boolean(k.focused);
   }
+  // An element pinned without a camera of its own keeps its place under the
+  // first keyframe's camera.
+  for (const k of keyframes) for (const el of k.all) if (el._pin === true) el._pin = keyframes[0].camera;
 
   // Plan the whole timeline before drawing anything, so --check can report
   // its length and unspoken text without rendering a frame. A keyframe with
   // `audio` holds until its voice ends, then `hold` seconds more.
-  let previous = { elements: [], camera: keyframes[0].camera };
+  let previous = { elements: [], camera: keyframes[0].camera, settings: new Map() };
   let startFrame = 0;
   const audio = [];
   for (const k of keyframes) {
     k.from = k.spec.clear ? renameIds(previous.elements, '::was') : previous.elements;
     k.fromCamera = previous.camera;
-    k.plan = planTransition(k.from, k.elements, k.spec);
-    k.total = (k.spec.duration ?? DEFAULT_DURATION) === 0 ? 0 : k.plan.total;
+    k.plan = planTransition(k, previous);
+    // A step whose only change is the camera (a focus, or the pull back
+    // from one) still takes its duration to move; it would cut otherwise.
+    const duration = k.spec.duration ?? DEFAULT_DURATION;
+    const moves = !k.spec.clear && ['x', 'y', 'width', 'height'].some(key => Math.abs(k.fromCamera[key] - k.camera[key]) > 0.5);
+    k.total = duration === 0 ? 0 : Math.max(k.plan.total, moves ? duration : 0);
     k.transitionFrames = Math.round(k.total * options.fps);
     let hold = k.spec.hold ?? 1.2;
     if (k.spec.audio) {
@@ -1297,8 +1731,12 @@ async function main() {
   }
   const overflow = overflowText(keyframes);
   for (const o of overflow) process.stderr.write(`animate: keyframe ${o.keyframe} "${o.text}" ${o.problem}\n`);
+  const small = smallScreenText(keyframes, options.files, options);
+  for (const m of small) process.stderr.write(`animate: keyframe ${m.keyframe} shows screenshot "${m.id}" with its text about ${m.px} px tall\n`);
+  const counts = countMismatches(keyframes);
+  for (const c of counts) process.stderr.write(`animate: keyframe ${c.keyframe} says ${c.said.join(' or ')} "${c.thing}" but shows ${c.shown.join(' or ')}\n`);
   if (flags.check) {
-    process.stdout.write(JSON.stringify({ keyframes: keyframes.length, duration: Number(totalSeconds.toFixed(2)), audio: audio.length, unspoken, overflow }, null, 1) + '\n');
+    process.stdout.write(JSON.stringify({ keyframes: keyframes.length, duration: Number(totalSeconds.toFixed(2)), audio: audio.length, unspoken, overflow, counts, small }, null, 1) + '\n');
     process.exit(flags.strict && unspoken.length ? 1 : 0);
   }
   if (flags.strict && unspoken.length) fail(`${unspoken.length} on-screen text(s) the narration never says (--strict)`);
@@ -1314,7 +1752,7 @@ async function main() {
     const stills = [];
     for (const [i, k] of keyframes.entries()) {
       const file = path.join(stillsDir, stillName(k, i));
-      fs.writeFileSync(file, await renderFrame(k.elements, k.camera, options, null));
+      fs.writeFileSync(file, await renderFrame(k.elements, k.camera, options, null, k.spec.clip));
       stills.push(file);
     }
     let sheets;
@@ -1361,14 +1799,14 @@ async function main() {
     const keyEase = k.spec.easing ? easing(k.spec.easing) : ease;
     for (let f = 1; f <= transitionFrames; f++) {
       const time = (f / transitionFrames) * total;
-      const elements = sampleTransition(plan, k.elements, k.from, time, keyEase);
+      const elements = sampleTransition(plan, k, time, keyEase);
       // The camera moves over the keyframe's duration, not the whole enter
       // sequence. After a clear it cuts as the old scene finishes leaving.
       const cameraTime = Math.min(total, k.spec.duration ?? DEFAULT_DURATION);
       const cam = k.spec.clear
         ? (time < plan.exitDuration ? k.fromCamera : k.camera)
         : lerpRect(k.fromCamera, k.camera, keyEase(windowProgress(time, 0, cameraTime)));
-      writeFrame(await renderFrame(elements, cam, options, boilTick(clock + time)));
+      writeFrame(await renderFrame(elements, cam, options, boilTick(clock + time), k.spec.clip));
     }
     clock += total;
     let tick = undefined;
@@ -1376,7 +1814,7 @@ async function main() {
       const nextTick = boilTick(clock + f / options.fps);
       // Static holds reuse one render; boiling re-renders when the seed changes.
       if (lastFrame && nextTick === tick && f > 0) repeatFrame();
-      else writeFrame(await renderFrame(k.elements, k.camera, options, nextTick));
+      else writeFrame(await renderFrame(k.elements, k.camera, options, nextTick, k.spec.clip));
       tick = nextTick;
     }
     clock += holdFrames / options.fps;
@@ -1418,6 +1856,7 @@ await main();
 //   "boil": 0,                   // hand-drawn wobble: re-seed strokes N times per second
 //   "easing": "inOutCubic",      // linear inCubic outCubic inOutCubic outBack
 //   "camera": {...},             // optional global camera (see keyframe camera)
+//   "effects": ["fx.mjs"],       // modules of named effects (see Effects above)
 //   "textX": "auto",             // where x sits on center-aligned free text: "left" (its box's
 //                                // left edge, Excalidraw's meaning), "center" (its middle,
 //                                // how the canvas's browser tab draws agent-written text), or
@@ -1430,9 +1869,18 @@ await main();
 //                            // a step there may instead name another scene file, "k2" or
 //                            // {"scene": "k2", "ids": [...]}, whose shared ids move into place
 //                            // ({"<scene name>": [[ids of step 0], [ids of step 1], ...]});
+//                            // or {"ids": [...], "focus": [ids], "set": {id: settings}}: the
+//                            // camera fits the focus (unless the keyframe has a camera), and
+//                            // set overrides those elements' settings for this step;
 //                            // "steps": "other.json" and "stepsKey": "name" to look elsewhere
 //       "ids": ["a", "b"],   // or show only these elements (a shape brings its bound label)
 //       "add": [...],        // extra elements drawn over the scene, e.g. a title
+//       "set": {"dot": {"enter": {"effect": "travel", "path": "q1"}}},  // element settings
+//                            // for this keyframe (see Element settings above)
+//       "pin": {"ids": ["title"], "camera": {...}},  // these keep the place on screen they
+//                            // have under `camera` while the keyframe's camera moves
+//       "clip": {"x": 0, "y": 0.2, "width": 1, "height": 0.8},  // show only this part of
+//                            // the screen (fractions), pinned elements excepted
 //       "textX": "center",   // per keyframe, overriding the board's
 //       "clear": true,       // a new scene: everything on screen fades out, the camera cuts,
 //                            // then this keyframe draws in, even where ids repeat
@@ -1450,8 +1898,9 @@ await main();
 //       "stagger": 0.2,      // delay between successive entering elements (auto-shrinks for big scenes)
 //       "enterDelay": 0,     // seconds before the first element enters
 //       "enterDuration": 0.6,
-//       "enter": "auto",     // auto | draw | pop | fade | rise | type | none
-//       "styles": {"title": "type"},   // per-element enter style overrides
+//       "enter": "auto",     // auto, or an effect for everything entering: draw write type
+//                            // fade rise pop travel none, or a story's own
+//       "styles": {"title": "type"},   // per-element enter effects
 //       "order": ["db", "api"],        // explicit enter order (unit = element, label's
 //                                      // container, or "group:<groupId>")
 //       "camera": {"fit": ["api", "db"], "padding": 40}  // or {"x","y","width","height"}
@@ -1459,5 +1908,6 @@ await main();
 //   ]
 // }
 //
-// auto enter styles: arrows/lines/freedraw grow along their path, rectangles,
-// ellipses and diamonds are traced then filled, text fades in.
+// auto enter effects: arrows/lines/freedraw grow along their path, rectangles,
+// ellipses and diamonds are traced then filled, hand-drawn text (Excalifont,
+// Virgil) writes on, code (Cascadia) types, and other text fades in.

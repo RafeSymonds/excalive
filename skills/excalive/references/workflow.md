@@ -77,15 +77,34 @@ says. The video is the deck, narrated, slide for slide:
 1. Copy the deck's headings first, before writing a word. Drop only what
    works only live (audience discussion, logistics, sources, Questions)
    and add an end card.
-2. Write each click's narration for the ear. Start each list beat with
-   its item, word for word. Spell numbers and dates as they are said, or
-   map them in the lexicon.
+2. Write each click's narration for the ear (`style.md`, "Writing for the
+   ear"). Start each list beat with its item, word for word.
 3. Never move one slide's content into another slide's narration.
 
 Compare the two scene lists before rendering:
 
     grep -o '^## [^ ]*' deck.md | uniq
     grep -o '^## [^ ]*' narration.md | uniq
+
+Then have a fresh model hear the whole narration, once before the first
+render and again after each round of edits. Give any model CLI (for
+example `claude -p`) the narration and this prompt:
+
+> You hear this once, at normal speaking pace, while watching the slides
+> it describes. You can't rewind. You have never heard of the subject.
+> 1. What is it about, and what does it tell you?
+> 2. Where did you lose the thread, and why?
+> 3. Did anything show up that was never set up, a "the X" you hadn't
+>    heard of, or an answer to something you never heard asked?
+> 4. Did the narration get more specific than you needed, so a detail
+>    felt random rather than an example?
+> 5. Where did the move from one sentence to the next feel abrupt or
+>    awkward? Quote the pair.
+> 6. Which sentence was hardest by ear?
+
+Fix what a listener would trip on and ignore flags the screen resolves.
+It always finds something, so stop when what is left is nits. It is a
+comprehension check, not a score, and takes seconds.
 
 ## 5. Check, render, review
 
@@ -99,10 +118,22 @@ sheets.
 
 You cannot trust a voice you have not heard. Check suspect words with
 misaki's phonemes (`style.md` has the snippet), then run a Whisper round
-trip (mlx-whisper, large-v3-turbo) and diff it against the narration to
-find the sections to hear first. Most diffs are homophones and digits.
-Whisper invents words over silence, so transcribe the last section
-without the end hold, or it hears "Thank you" over four quiet seconds.
+trip and diff it against the narration to find the sections to hear
+first:
+
+- Transcribe each beat's clip with mlx-whisper, large-v3-turbo.
+  small.en invents errors of its own (it heard "Everything" as
+  "Nothing").
+- Diff against the narration with the lexicon applied, so respellings
+  do not show up as differences.
+- Most diffs are homophones and digits against number words. The ones
+  that change the meaning are fused words ("a round" heard "around"):
+  reword those, re-voice, and transcribe again.
+- Whisper invents words over silence. It repeats a two-word clip over
+  the hold after it and adds sentences after a clip ends, so check a
+  suspect diff against the clip's length. Transcribe the last section
+  without the end hold, or it hears "Thank you" over four quiet seconds.
+
 Then a person listens to the whole video before it goes anywhere.
 
 ## 6. When the deck changes

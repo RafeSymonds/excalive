@@ -7,6 +7,7 @@
 #   excalive video  story.md     voice every beat with Kokoro, then draw the video
 #   excalive animate [args]      the renderer on its own (see scripts/animate.mjs)
 #   excalive measure [--size 48 --font 6] text...   drawn width of each text
+#   excalive image  scene.excalidraw shot.png [--id shot] [--scale 2]   put in or swap a screenshot
 #   excalive usage  [paths]      tokens, time and cost of Claude Code transcripts
 #
 # uv builds story.py's environment (Kokoro, spaCy model) on the first run.
@@ -15,7 +16,8 @@ case "$1" in
   check|slides|video) exec uv run --quiet --script "$root/scripts/story.py" "$@" ;;
   animate) shift; exec node "$root/scripts/animate.mjs" "$@" ;;
   measure) shift; exec node "$root/scripts/animate.mjs" --measure "$@" ;;
+  image) shift; exec python3 "$root/scripts/image.py" "$@" ;;
   usage) shift; exec python3 "$root/scripts/usage.py" "$@" ;;
-  ""|-h|--help|help) sed -n '2,12s/^# \{0,1\}//p' "$0" ;;
-  *) echo "excalive: unknown command '$1' (check, slides, video, animate, usage)" >&2; exit 2 ;;
+  ""|-h|--help|help) sed -n '2,13s/^# \{0,1\}//p' "$0" ;;
+  *) echo "excalive: unknown command '$1' (check, slides, video, animate, measure, image, usage)" >&2; exit 2 ;;
 esac

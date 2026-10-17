@@ -48,9 +48,10 @@ follows.
 ![A DNS lookup, drawn step by step](examples/dns/preview.gif)
 
 A diagram explainer: one arrow per step as the resolver asks the root,
-TLD and authoritative servers, then caches the answer. Each color means
-one thing: blue asks, gray refers, green is the address. A list on why
-caching matters and a one-line takeaway follow.
+TLD and authoritative servers, then caches the answer, and the camera
+moves in on the cache while the title stays put. Each color means one thing: blue asks, gray
+refers, green is the address. A list on why caching matters and a
+one-line takeaway follow.
 
     ## lookup 2
     The resolver starts at the top. It asks a root server: example.com?
@@ -161,11 +162,32 @@ A step that lists ids shows those elements of the scene. A step that
 names another scene file (`"search-3"`) shows that file instead, and
 every element that shares an id with the step before slides, resizes or
 recolors into place. New elements draw in: arrows grow along their path,
-shapes draw their outline and fill, text fades in. Removed ones fade out.
+shapes draw their outline and fill, hand-drawn labels write themselves
+on, code types, and plain text fades in. Removed ones fade out.
+
+A step can also be an object. `"focus"` moves the camera in on some of
+its elements while the title stays where it is, and `"set"` changes how
+elements move in that step:
+
+    {"ids": ["frame", "browser", "resolver", "cache"],
+     "focus": ["browser", "cache"]}
+
+A screenshot is an image in a scene: `excalive image` fits a capture
+into a scene, marks the parts you will point at as invisible boxes, and
+swaps in the next capture while hand-drawn rings and labels stay put.
+A step that names the swapped copy cuts to the app's next state.
+
+How each element enters, changes and leaves is an effect. The built-in
+ones cover the house style; an element picks others, with timing, in
+Excalidraw's own `customData`, and a story can bring effects it writes
+itself (`effects: [effects.mjs]`). Every step still lands on its scene
+as drawn, so the deck and the checks see what the video settles on.
+[`effects.md`](skills/excalive/references/effects.md) has the details.
 
 Other front matter: `voice` and `speed` (Kokoro), `silent` (on-screen
 text the words need not say, per scene), `title` (size, color and font of
-the titles drawn above diagrams, Nunito by default), `text_x`, `intro`, `end_hold`, `gap`.
+the titles drawn above diagrams, Nunito by default), `effects` (the
+story's own effects), `text_x`, `intro`, `end_hold`, `gap`.
 `skills/excalive/scripts/story.py` opens with the full list.
 
 ## Commands
@@ -173,6 +195,7 @@ the titles drawn above diagrams, Nunito by default), `text_x`, `intro`, `end_hol
     excalive check   story.md      every check, in about a second; no render
     excalive slides  story.md      a still per click, a Slidev deck, contact sheets
     excalive video   story.md      voice every section, then draw the video
+    excalive image   scene.excalidraw shot.png   put a screenshot in a scene, or swap it
     excalive animate [args]        the renderer alone: files, steps, snapshots, storyboards
     excalive measure --size 48 "text"   the drawn width of a line of text
     excalive usage   [paths]       tokens, time and cost of Claude Code transcripts
@@ -187,7 +210,15 @@ the titles drawn above diagrams, Nunito by default), `text_x`, `intro`, `end_hol
   page, and diagram text outside its frame, measured with the fonts the
   frames are drawn with.
 - **Speech.** Text a voice misreads: "Sep 11", "1M", "1214" read as a
-  year, a version like "K2.5", an initialism with a hyphen.
+  year, a version like "K2.5", an initialism with a hyphen. Words that go
+  stale or point nowhere once the video is out: "tomorrow", "next time",
+  "the next slide". A sentence that mostly repeats one from the last 25
+  seconds.
+- **Counts.** A number said that disagrees with the same thing counted on
+  screen: "two servers" over "3 servers".
+- **Small screenshot text.** A screenshot whose own text will look smaller
+  than 20 px of a 1080p frame, from its size on screen and its capture
+  scale.
 - **Structure.** Missing scenes and steps, and a slide title used twice.
 
 `slides` takes seconds. `video` voices only the sections whose words
@@ -206,9 +237,13 @@ its transcripts.
 
 - [`style.md`](skills/excalive/references/style.md): the house style. Page geometry,
   fonts, colors, the kinds of slide with their JSON, measuring, diagrams,
-  writing titles and list items, and the rules for a narrated video.
+  writing titles and list items, writing for the ear, motion, and the
+  rules for a narrated video and its voice.
 - [`workflow.md`](skills/excalive/references/workflow.md): a deck and its video, step by
   step, and how to run agents on it.
+- [`effects.md`](skills/excalive/references/effects.md): motion. How elements enter,
+  change and leave, element settings, `focus` and `set` on a step, and
+  writing an effect.
 - [`SKILL.md`](skills/excalive/SKILL.md): what the agent reads.
 - `skills/excalive/scripts/story.py` and `animate.mjs` open with their full
   reference: every front matter key and every storyboard field.
@@ -222,7 +257,7 @@ its transcripts.
 | `skills/excalive/bin/excalive` | The command |
 | `skills/excalive/scripts/` | `story.py` (stories, checks, voices, slides), `animate.mjs` (the renderer), `usage.py` (transcript costs) |
 | `skills/excalive/assets/fonts/` | Nunito, which the headless renderer lacks |
-| `skills/excalive/references/` | The house style and the workflow |
+| `skills/excalive/references/` | The house style, the workflow, and motion and effects |
 | `examples/` | Three stories with their scenes, previews and videos |
 
 ## Credits
