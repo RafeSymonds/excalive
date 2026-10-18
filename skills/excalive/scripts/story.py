@@ -351,8 +351,8 @@ def storyboard(story: Story, runs, audio=None, names=False):
     for i, b in enumerate(story.beats):
         k = {'scene': str(b['file']), 'textX': b['text_x'], 'camera': b['camera']}
         # A beat with no words (a slide without notes) has nothing to compare.
-        if b['text']:
-            k['narration'] = b['text']
+        if spoken_text(b['text']):
+            k['narration'] = spoken_text(b['text'])
         if b['step'] is not None:
             k['step'] = b['step']
         if b['title_el']:
@@ -581,7 +581,7 @@ def voice(story: Story, voice_name: str, speed: float):
     adir.mkdir(parents=True, exist_ok=True)
     files, todo = [], []
     for b in story.beats:
-        chunks = chunk([say(p) for p in flatten(b['text'])])
+        chunks = chunk([say(p) for p in flatten(spoken_text(b['text']))])
         h = hashlib.sha1(json.dumps([chunks, voice_name, speed]).encode()).hexdigest()[:16]
         f = adir / f'{h}.wav'
         files.append(f)
