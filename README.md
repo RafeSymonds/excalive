@@ -237,8 +237,9 @@ its transcripts.
 
 - [`style.md`](skills/excalive/references/style.md): the house style. Page geometry,
   fonts, colors, the kinds of slide with their JSON, measuring, diagrams,
-  writing titles and list items, writing for the ear, motion, and the
-  rules for a narrated video and its voice.
+  building the argument, writing titles and list items, writing the
+  notes, writing for the ear, motion, and the rules for a narrated video
+  and its voice.
 - [`workflow.md`](skills/excalive/references/workflow.md): a deck and its video, step by
   step, and how to run agents on it.
 - [`effects.md`](skills/excalive/references/effects.md): motion. How elements enter,

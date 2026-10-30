@@ -37,7 +37,10 @@ List the build steps, one list of element ids per click:
 
 One section per click, headed `## <scene> <step> | <slide title>`, with
 the title on the scene's first section. The text under a heading is what
-you say on that click. In a deck it becomes the presenter notes.
+you say on that click. In a deck it becomes the presenter notes, and in
+the video it is what the voice says, so write it once, to `style.md`
+("Writing the notes"). Presenter-only lines go in `Direction:` and
+`Ask:` paragraphs.
 
     ---
     scenes: [cards, diagrams]
@@ -69,17 +72,22 @@ has one page per slide, the PPTX one slide per click with its notes. A
 PDF export of more than about 30 slides can time out in one pass; export
 it in page ranges and join them with `pdfunite`.
 
-## 4. Write the video's story
+## 4. Derive the video's story
 
-A narration file has the same format, but its text is what the voice
-says. The video is the deck, narrated, slide for slide:
+The video is the deck, narrated, slide for slide, and its words are the
+deck's notes. Derive the narration file from the deck, so the two cannot
+drift apart:
 
-1. Copy the deck's headings first, before writing a word. Drop only what
-   works only live (audience discussion, logistics, sources, Questions)
-   and add an end card.
-2. Write each click's narration for the ear (`style.md`, "Writing for the
-   ear"). Start each list beat with its item, word for word.
-3. Never move one slide's content into another slide's narration.
+1. Copy the deck's story to `narration.md` and give it the video's front
+   matter (`video`, `voice`, `lexicon`).
+2. Drop the scenes that work only live (audience discussion, logistics,
+   sources, Questions) and their `silent` entries, and add an end card.
+3. Drop every `Direction:` and `Ask:` paragraph.
+
+Edit the deck, never the narration, and derive it again after each
+change. A short script that does the three steps makes that one
+command. Notes written for the ear read correctly as narration; where
+one does not, fix it in the deck.
 
 Compare the two scene lists before rendering:
 
@@ -102,7 +110,8 @@ example `claude -p`) the narration and this prompt:
 >    awkward? Quote the pair.
 > 6. Which sentence was hardest by ear?
 
-Fix what a listener would trip on and ignore flags the screen resolves.
+Fix what a listener would trip on, in the deck's notes, and ignore
+flags the screen resolves.
 It always finds something, so stop when what is left is nits. It is a
 comprehension check, not a score, and takes seconds.
 

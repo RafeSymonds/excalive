@@ -18,7 +18,7 @@ this skill's base directory:
 | Path | What |
 |---|---|
 | `bin/excalive` | The command. Wherever this file says `excalive`, run `<skill dir>/bin/excalive`. |
-| `references/style.md` | House style: page, fonts, colors, slide kinds, card JSON, writing and narration rules. **Read before drawing a card or writing narration.** |
+| `references/style.md` | House style: page, fonts, colors, slide kinds, card JSON, building the argument, writing the notes, writing for the ear, narration and voice. **Read before drawing a card or writing notes.** |
 | `references/workflow.md` | The steps for a deck and its video, and how to hand the work to agents. |
 | `references/effects.md` | Motion: how elements enter, change and leave, element settings, step `focus` and `set`, and writing an effect. |
 | `scripts/story.py`, `scripts/animate.mjs` | Full reference in their opening comments: every front matter key and storyboard field. |
@@ -139,7 +139,9 @@ Then put it in a scene, and swap the next state into a copy:
 
 Each `## <scene> <step> | <title>` is a beat, with the title on a
 scene's first beat. In a deck the text is the presenter notes, in a
-video what the voice says. Titles must be unique. Other front matter:
+video what the voice says, and the video's story is derived from the
+deck's. A `Direction:` paragraph is for the presenter alone and is never
+checked as said. Titles must be unique. Other front matter:
 `voice`, `speed`, `audio_delay` (0.3), `gap`, `scene_gap`, `end_hold`
 (4.0), `title` ({size, color, font}), `effects` (the story's own effect
 modules), `text_x`, `strict`, `intro`
@@ -207,8 +209,10 @@ bottom of `scripts/animate.mjs`.
 2. **Write for the ear.** "Sep 11", "1M", "1214" and "K2.5" read badly
    aloud; the lint says how to fix each. Pronunciations go in a lexicon:
    `{"Navier": {"ipa": "nævjˈA"}, "K2.5": "K two point five"}`.
-3. **A video is the deck, narrated, slide for slide.** Drop only what works
-   only live, and never move one slide's content into another's narration.
+3. **A video is the deck, narrated, slide for slide.** Its words are the
+   deck's notes: derive the narration from the deck and edit only the
+   deck. Drop only what works only live, and never move one slide's
+   content into another's narration.
 4. **Look at every contact sheet** before calling it done. The checks do
    not see a label on an arrow or text off the page.
 5. **Nobody can hear the video for you.** Check suspect words with misaki,
@@ -222,3 +226,7 @@ bottom of `scripts/animate.mjs`.
    mid-transition. That render has no title and frames the scene on the
    whole screen, so judge a focus by its `excalive slides` still, and its
    move by frames pulled from the video.
+8. **A long click loses the listener.** Fill the time with more build
+   steps, not more words: a click past about 150 words with nothing new
+   drawn needs another step. Examples use what the click shows, and
+   numbers the listener must combine go on screen.

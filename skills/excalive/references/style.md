@@ -236,6 +236,43 @@ with steps `[["frame", "title"], ["frame", "title", "m0", "i0"], ...]`.
   6. Place everything from the lane positions and the row height, not by
      eye.
 
+## Building the argument
+
+A talk teaches one idea at a time, in an order the audience could
+rebuild on their own. A deck written as a tour of products or a list of
+measurements leaves the audience holding facts with nothing to hang
+them on.
+
+- **Start with the problem.** Open on what goes wrong without the idea,
+  in a situation the audience already knows, and say it plainly before
+  any mechanism appears.
+- **Build the answer up.** Each slide fixes what the last one left
+  broken and says which part does the work. Someone who saw the problem
+  should be able to rebuild the design from it.
+- **One idea per slide.** A slide that needs a paragraph is two or three
+  slides. The slide is the anchor and the notes carry the prose.
+- **Research for accuracy, teach the idea.** Read the source and capture
+  the real thing so every claim is right. That research lives in the
+  notes and a sources file beside the deck, not on the slides.
+- **A product is an example, not a column.** Name one on a slide only
+  when its design choice teaches something the idea alone does not, and
+  then as the one example. No table with a row per product.
+- **Measured numbers stay off the slide.** Token counts, size caps,
+  thresholds and version numbers from a capture go in the sources. Keep
+  a number when the idea needs its size ("a million-token window").
+  Round numbers in a worked example are different: they go on screen
+  ("Writing the notes").
+- **One running example, in plain words.** Pick one situation for the
+  whole talk and tell it in everyday words ("it keeps running the slow
+  tests"). Command lines, flags, file names, IDs and verbatim output stay
+  off the slide unless the exact text is the point.
+- **A captured artifact is an example of the thing.** Show it as what
+  that thing looks like, not as an experiment you ran ("we asked it
+  twice and...").
+- **Connect to the talks before it.** In a series, say what a mechanism
+  shares with one the audience has already seen, so the series sounds
+  like one design built up.
+
 ## Writing on the slide
 
 - **Titles** name what the slide is about: a noun phrase of two to six
@@ -276,6 +313,93 @@ with steps `[["frame", "title"], ["frame", "title", "m0", "i0"], ...]`.
   until none is left. A deck only reports them, because live notes read
   code, tables and sources selectively. The speech lint runs only on
   stories that make a video (or set `lint: true`).
+
+## Writing the notes
+
+A beat's text is the presenter's notes in a deck and the narrator's
+words in a video, so it is written once, for both. Notes that only gloss
+each slide fill a fraction of the slot. Scripts of about 2,000 words for
+80-minute talks made 13-minute videos, and in the room the presenter
+said three to four times as much. The notes should hold what the
+presenter adds.
+
+**Length.** About 150 spoken words per planned minute: a 3-minute slide
+carries about 450 words. Open each slide's notes with its plan in a
+presenter-only line, `Direction: About 3 minutes. 4 clicks.`, and make
+the minutes add up to the slot. This is a guide for the writer, not a
+check.
+
+**More time means more clicks.** A click whose words run past about 150
+with nothing new on screen is missing a build step: draw the next step
+and move the second half of the words onto it. Adding words to clicks
+that already have them holds the slide still for a minute while the
+voice runs on, and that is where a listener gets lost.
+
+**Each click explains its claim**, in this order:
+
+1. The claim, opening with the words on screen.
+2. Why it holds, or what breaks without it. The alternative that fails
+   is often the clearest reason.
+3. The example: the talk's running example, applied to what this click
+   shows.
+4. What it means for the listener's own work: what to do, what to watch
+   for, when it bites.
+
+Not every click needs all four, but every content slide does. The why
+and the example are new information, so this is not saying a point
+twice.
+
+**Examples follow the screen.** A listener can follow an example about
+what they are looking at, and loses one about something they have to
+picture.
+
+- The example works with the things this click draws. If it needs an
+  object the screen does not show (a second file, a forty-page document,
+  a new error), draw it or cut the example.
+- Numbers the listener has to combine go on screen, one build step per
+  number, said as each appears. Spoken alone, an example carries at most
+  two numbers, with the result first: "about five times the cost:
+  100,000 tokens, or 19,000 with the cache."
+- An aside about something off screen runs about three sentences.
+- Keep to the running example. A fresh scenario on every click makes
+  the listener rebuild the setup every minute.
+
+**Voice.**
+
+- "We" walks through a mechanism: "we start with the system prompt, we
+  send the first message, and the window starts to fill." In recorded
+  talks the presenter said "we" about 30 times per 1,000 words, and the
+  scripts written for them almost never did. "We" never replaces the
+  actor: what a program does and what a person does are still said as
+  theirs.
+- "You" for the listener's own use.
+- No "I", because the narrator is not the presenter. The presenter's own
+  experience is often the best example in the room, so leave a prompt
+  for it in a `Direction:` paragraph ("Direction: Your story, if you have
+  one: a correction you had to give twice."). Never write a first-person
+  story for the presenter.
+
+**Presenter-only paragraphs.** Two kinds of paragraph are for the
+presenter alone: `Direction:` (timing, what to click, a story to tell)
+and `Ask:` (a question for the audience and the answers to expect).
+`excalive check` skips `Direction:` paragraphs, and the video's story
+drops both (`workflow.md`).
+
+**Ask the audience.** At least one question per part, as an `Ask:`
+paragraph: `Ask: Which of these would you keep, and why? Take two or
+three answers before the click.` The spoken words pose the same question
+and the next click answers it, so the video works without the pause. A
+question the audience raised when the talk was given goes in the notes
+as an aside ("You might wonder whether a file read twice is sent
+twice.").
+
+**From a recording.** A recording of the talk as given is the best
+source for better notes: set its transcript beside the script, slide by
+slide, and the gap is what the notes are missing. Take the explanations,
+the examples and the questions. Leave the hedged claims ("I think it
+does that") and the tangents. A recording has the audience's voices in
+it, so its transcript stays out of the repository, and the notes
+paraphrase it instead of copying lines.
 
 ## Writing for the ear
 
@@ -318,7 +442,9 @@ hear it twice, rewrite it.
   reads it as a year ("sixteen thirty-eight"). A time on the hour is
   "9 PM", not "9:00 PM", which is read "nine colon zero zero". "1M" is
   read "one em": write "1 million". A version is said with "point", which
-  takes a lexicon entry (below). A number said must agree with the
+  takes a lexicon entry (below). An invented code of four digits is read
+  as a year too ("error 4012" is "forty twelve"): use three digits. A
+  number said must agree with the
   screen: the check reports "two servers" said over "3 servers".
 - **Dates** are abbreviated on screen and written out in the words
   ("Friday, September 11"); the check matches the two.
@@ -381,6 +507,10 @@ there. The mechanics, every setting and how to write an effect are in
   short summary folded the schedule and the problem statement into the
   title card's narration: a minute of talk with nothing on screen to
   follow.
+- **The video's words are the deck's notes.** Derive the video's story
+  from the deck (`workflow.md`) and edit only the deck, so the two cannot
+  drift. A narration written separately, as a summary of the talk, ran
+  9 minutes for an 80-minute talk.
 - **Never move a slide's content into another slide's narration.** Check
   what a dropped slide said: a lasting fact said only there is lost with
   it, so put it on a teaching slide in the deck.
@@ -436,7 +566,9 @@ installs it and its weights, about 330 MB, on the first run).
   entry only if it improves on the bare reading. Known misses: misaki
   spells out "README", reads "URLs" as "U R L S" and "VS Code" as "vees
   code", reads JSON and YAML as letters, spells "GET" mid-sentence (fix:
-  `{"GET": {"ipa": "ɡˈɛt"}}`), and says "id" as the word (write "ID").
+  `{"GET": {"ipa": "ɡˈɛt"}}`), and says "id" and "ids" as words (write
+  "ID" and "IDs", or add `{"id": "I-D", "ids": "I-Dees"}` where the text
+  keeps the lowercase).
 - **Heteronyms.** misaki guesses a word's part of speech and sometimes
   guesses wrong: it voiced the verb "Use" as the noun, "read" in the
   wrong tense, and "red" as "read". Phonemize every word with two
