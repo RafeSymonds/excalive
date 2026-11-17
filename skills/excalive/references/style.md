@@ -35,15 +35,17 @@ else in this guide holds; the positions change.
 
 | Part | Where | Size |
 |---|---|---|
-| Title | x 60, y 220, left-aligned | 56 (set `title: {size: 56}`) |
-| Content area | x 60 to 800, y 400 to 1260 | |
+| Title | x 60, y 200, left-aligned | 56 (set `title: {size: 56}`) |
+| Content area | x 60 to 800, y 330 to 1060 | |
+| Captions | centered on y 1165 | 76 |
 
 The page keeps clear of what phone apps draw over a short: the top 200
-units, the bottom 340, and a strip down the right edge. A card's `frame`
-is 900 by 1600, and `check` reports text past x 800 or below y 1260.
-Draw diagrams about 740 wide and 840 tall, with labels at 32 or more:
-a wide diagram fitted into the tall page shrinks to half its size. A
-`slides` deck from a tall story gets `aspectRatio: 9/16`.
+units, the bottom 340, and a strip down the right edge. The band
+between the content area and that bottom strip holds the captions. A
+card's `frame` is 900 by 1600, and `check` reports text past x 800 or
+below y 1060. Draw diagrams 740 by 730, which fit at 1:1, with labels
+at 44 or more: a wide diagram fitted into the tall page shrinks to half
+its size. A `slides` deck from a tall story gets `aspectRatio: 9/16`.
 
 ## Type
 
@@ -558,6 +560,39 @@ there. The mechanics, every setting and how to write an effect are in
   changes the rate, not the intonation. The levers are the words
   (sentence length) and the pauses, `gap` after each beat (0.5 s) and
   `scene_gap` after each slide (1.0 s).
+
+## A short
+
+A short is not a talk cut down. It is built for a phone, for a viewer
+who scrolls away in the first seconds unless something makes them stay.
+Fast comes from the picture changing often and from cutting ideas, not
+from clipped sentences.
+
+- **Hook first.** The first sentence states the problem the viewer has,
+  on a card already drawn. No title card, no greeting, no "in this
+  video".
+- **Then why it hurts, the answer, how it works, the takeaway.** One
+  sentence for each of the first two, three or four for how it works,
+  and a closing card with the one line to remember. The story should
+  make sense heard once with no pictures.
+- **One complete sentence per beat.** Never split a sentence across
+  beats: each beat is voiced alone, so a split sentence loses its
+  intonation and sounds chopped. No fragments ("Again. And again.").
+- **The picture changes inside a sentence.** When a sentence names
+  several things, put them in one step and give each a `say` cue
+  (`effects.md`), so each pops in as its word is spoken.
+- **Diagrams, not slides.** Scenes in a short carry no titles: leave out
+  the `| title` and the captions carry the words. Draw big: boxes
+  600 wide, labels at 56 to 72.
+- **Pace.** `speed: 1.1`, `trim: true`, `transition: 0.6`,
+  `audio_delay: 0.1`, `gap: 0.3`, `scene_gap: 0.4`, `end_hold: 1.5`:
+  about half a second between sentences. Without `trim`, Kokoro's own
+  padding adds about half a second to every pause. 30 to 45 seconds, 80 to 110 words.
+- **Captions on.** `captions: true` burns in a few words at a time with
+  the word being said highlighted. Most people watch shorts muted.
+- **Pop what lands.** `{"excalive": {"enter": "pop"}}` on the element a
+  beat lands on: the key word, the box that answers the problem.
+- **Talk to one person.** "You" and "your", everyday words, no hedging.
 
 ## Voice: Kokoro
 

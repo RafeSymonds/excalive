@@ -54,7 +54,7 @@ tools, arrows, layout checks) use mcp-excalidraw-server's own skill.
 - A **diagram** is drawn anywhere, about 1360 wide, with an invisible
   `frame` rectangle around the whole drawing in every step.
 - A vertical short uses `page: tall`: a 900 by 1600 page, title at
-  (60, 220), diagrams about 740 wide. `references/style.md` has the page.
+  (60, 200), diagrams about 740 by 730. `references/style.md` has the page.
 - Build steps go in `steps.json` beside the scenes, one list of ids per
   click: `{"scene": [["frame", "a"], ["frame", "a", "b"]]}`.
 - Elements match across steps by `id`. Same id: it moves, resizes,
@@ -148,6 +148,12 @@ checked as said. Titles must be unique. Other front matter:
 (4.0), `title` ({size, color, font}), `effects` (the story's own effect
 modules), `text_x`, `strict`, `intro`
 (`cut`, the default, opens on the first scene already drawn).
+
+For a short, `page: tall` (9:16), `transition` (seconds each step takes
+to draw in, 1.2 by default), `captions: true` (word-timed captions
+burned in, timed from the voice), `trim: true` (cut Kokoro's own silence
+off each clip, so `gap` is the whole pause) and `music: {file, volume}` (a track
+under the voice). `references/style.md` has the short's recipe.
 
 ## Commands
 

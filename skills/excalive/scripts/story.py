@@ -6,6 +6,7 @@
 #   "soundfile",
 #   "numpy",
 #   "pyyaml",
+#   "pillow",
 #   "pip",
 #   "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
 # ]
@@ -36,6 +37,10 @@ Front matter (paths are relative to the story file):
   voice:   af_heart                  Kokoro voice; speed: 1.0
   lexicon: [lexicon.json]            pronunciations: {term: say} or {term: {ipa: ...}}
   audio_delay: 0.3   gap: 0.5   scene_gap: 1.0   end_hold: 4.0
+  transition: 1.2                    seconds each step takes to draw in; 0.5 to 0.7 for a fast short
+  trim:    false                     cut Kokoro's own silence (about 0.5 s) off each clip, so gap is the pause
+  captions: true                     word-timed captions burned in (see Captions); or {size: 68, ...}
+  music:   {file: bed.mp3, volume: 0.12}   a track looped under the voice, faded out at the end
   text_x:  auto                      auto, left or center, or {scene: left} (see scene_text_x)
   lint:    false                     speech lint on a story with no video
   title:   {size: 64, color: "#1B2547", font: 6}   font 6 is Nunito, 5 hand-drawn
@@ -279,11 +284,13 @@ def scene_text_x(story: Story, scene: str, elements) -> str:
 # `page: tall` is 900 by 1600, rendered at 1080 by 1920, for vertical shorts.
 # Its title and content area keep clear of what the phone apps draw over a
 # short: the top 200 units, the bottom 340, and a strip down the right edge.
+# The band between the content area and that bottom strip (y 1080 to 1250)
+# holds the captions.
 PAGES = {
     'wide': {'w': 1600, 'h': 900, 'title': (120, 100), 'content': (120, 220, 1360, 620),
              'clip_y': 190, 'right': 1480, 'bottom': 860, 'video': (1920, 1080)},
-    'tall': {'w': 900, 'h': 1600, 'title': (60, 220), 'content': (60, 400, 740, 840),
-             'clip_y': 370, 'right': 800, 'bottom': 1260, 'video': (1080, 1920)},
+    'tall': {'w': 900, 'h': 1600, 'title': (60, 200), 'content': (60, 330, 740, 730),
+             'clip_y': 300, 'right': 800, 'bottom': 1060, 'video': (1080, 1920)},
 }
 
 
@@ -389,6 +396,8 @@ def storyboard(story: Story, runs, audio=None, names=False):
         # video this is. `intro: draw` draws it in from white instead.
         if i == 0 and story.opt('intro', 'cut') != 'draw':
             k['duration'] = 0
+        elif story.opt('transition') is not None:
+            k['duration'] = float(story.opt('transition'))
         # Titles stay on screen the whole time, so the words need not read
         # them out: a card's `title` and the title drawn above a diagram.
         silent = ['title', 'story-title'] + ((story.opt('silent', {}) or {}).get(b['scene']) or [])
@@ -597,18 +606,37 @@ def lint(story: Story, lexicon: dict):
     return found + again
 
 
+# Kokoro pads each clip with about 0.3 s of silence before the first word
+# and 0.2 s after the last. `trim: true` cuts it to TRIM_KEEP, so the pause
+# between two beats is what `gap` and `audio_delay` say.
+TRIM_KEEP = 0.04
+TRIM_LEVEL = 0.01
+
+
+def trim_silence(audio, words):
+    import numpy as np
+    loud = np.flatnonzero(np.abs(audio) > TRIM_LEVEL)
+    if not len(loud):
+        return audio, words
+    keep = int(TRIM_KEEP * RATE)
+    a, b = max(0, loud[0] - keep), min(len(audio), loud[-1] + keep + 1)
+    shift = a / RATE
+    return audio[a:b], [[w, round(max(0.0, s - shift), 3), round(max(0.0, e - shift), 3)] for w, s, e in words]
+
+
 def voice(story: Story, voice_name: str, speed: float):
     """One wav per beat in <work>/audio, named by the hash of what it says."""
     say = compile_lexicon(load_lexicon(story))
+    trim = bool(story.opt('trim', False))
     adir = story.work / 'audio'
     adir.mkdir(parents=True, exist_ok=True)
     files, todo = [], []
     for b in story.beats:
         chunks = chunk([say(p) for p in flatten(spoken_text(b['text']))])
-        h = hashlib.sha1(json.dumps([chunks, voice_name, speed]).encode()).hexdigest()[:16]
+        h = hashlib.sha1(json.dumps([chunks, voice_name, speed] + (['trim'] if trim else [])).encode()).hexdigest()[:16]
         f = adir / f'{h}.wav'
         files.append(f)
-        if not f.exists():
+        if not f.exists() or not f.with_suffix('.words.json').exists():
             todo.append((f, chunks))
     if todo:
         print(f'voicing {len(todo)} of {len(files)} beats with Kokoro ({voice_name})')
@@ -620,19 +648,241 @@ def voice(story: Story, voice_name: str, speed: float):
         pipe = KPipeline(lang_code=voice_name[0] if voice_name[0] in 'ab' else 'a',
                          repo_id='hexgrad/Kokoro-82M')
         for n, (f, chunks) in enumerate(todo, 1):
-            audio = [r.audio.numpy() for c in chunks
-                     for r in pipe(c, voice=voice_name, speed=speed, split_pattern=None)
-                     if r.audio is not None]
+            # Each word's time in the clip, from Kokoro's own durations, for
+            # captions: [text, start, end] in seconds.
+            audio, words, at = [], [], 0.0
+            for c in chunks:
+                for r in pipe(c, voice=voice_name, speed=speed, split_pattern=None):
+                    if r.audio is None:
+                        continue
+                    for t in r.tokens or []:
+                        if t.start_ts is not None and t.end_ts is not None:
+                            words.append([t.text, round(at + t.start_ts, 3), round(at + t.end_ts, 3)])
+                    audio.append(r.audio.numpy())
+                    at += len(audio[-1]) / RATE
             if not audio:
                 fail(f'Kokoro produced no audio for {f.name}')
+            audio = np.concatenate(audio)
+            if trim:
+                audio, words = trim_silence(audio, words)
+            f.with_suffix('.words.json').write_text(json.dumps(words))
             # Written under a temporary name, so an interrupted run never
             # leaves a truncated clip in the cache.
             tmp = f.with_suffix('.part.wav')
-            sf.write(str(tmp), np.concatenate(audio), RATE)
+            sf.write(str(tmp), audio, RATE)
             tmp.rename(f)
             print(f'  {n}/{len(todo)}', end='\r', flush=True)
         print()
     return files
+
+
+# ---------------------------------------------------------------- captions
+#
+# `captions: true` burns word-timed captions into the video, the way short
+# videos are captioned: a few words at a time, big and bold, the word being
+# said highlighted. The words come from the story (not the lexicon's
+# respellings) and their times from Kokoro's own durations, so they cannot
+# drift from the voice. Settings, all optional, sizes in page units:
+#
+#   captions: {size: 76, y: 1165, words: 3, chars: 18, weight: 800,
+#              color: "#1B2547", highlight: "#ffd43b", outline: "#ffffff", upper: false}
+#
+# `y` is the middle of the caption line. On a tall page the content area
+# stops at y 1060 so the captions have their own band below it.
+
+CAPTION_DEFAULTS = {
+    'tall': {'size': 76, 'y': 1165},
+    'wide': {'size': 52, 'y': 815},
+}
+CAPTION_FONT = Path(__file__).resolve().parent.parent / 'assets' / 'fonts' / 'Nunito-Variable.ttf'
+
+
+def _norm(word: str) -> str:
+    return re.sub(r'[^0-9a-z]', '', word.lower())
+
+
+def align_words(text: str, timed: list) -> list:
+    """The story's own words, each with the time Kokoro said it.
+
+    Kokoro's tokens follow the lexicon's respellings and split off
+    punctuation, so they are matched to the story's words by sequence; a
+    run that does not match (a respelled name) shares its tokens' time
+    evenly."""
+    import difflib
+    words = ' '.join(flatten(spoken_text(text))).split()
+    tokens = [t for t in timed if _norm(t[0])]
+    if not words or not tokens:
+        return []
+    a, b = [_norm(w) for w in words], [_norm(t[0]) for t in tokens]
+    out = [None] * len(words)
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if tag == 'equal':
+            for k in range(i2 - i1):
+                out[i1 + k] = [words[i1 + k], tokens[j1 + k][1], tokens[j1 + k][2]]
+        elif tag == 'replace':
+            start, end = tokens[j1][1], tokens[j2 - 1][2]
+            step = (end - start) / (i2 - i1)
+            for k in range(i2 - i1):
+                out[i1 + k] = [words[i1 + k], start + k * step, start + (k + 1) * step]
+    # Words with no token at all sit between their neighbours.
+    for i, w in enumerate(out):
+        if w is None:
+            prev = next((out[j][2] for j in range(i - 1, -1, -1) if out[j]), 0.0)
+            nxt = next((out[j][1] for j in range(i + 1, len(out)) if out[j]), prev)
+            out[i] = [words[i], prev, max(prev, nxt)]
+    return out
+
+
+def caption_chunks(words: list, max_words: int, max_chars: int) -> list:
+    """Words grouped a few at a time, breaking after a clause ends."""
+    chunks, cur = [], []
+    for w in words:
+        if cur and (len(cur) >= max_words or len(' '.join(x[0] for x in cur + [w])) > max_chars):
+            chunks.append(cur)
+            cur = []
+        cur.append(w)
+        if re.search(r'[.,;:!?]["\')]*$', w[0]):
+            chunks.append(cur)
+            cur = []
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+def _display(word: str, upper: bool) -> str:
+    word = re.sub(r'[.,;:]+(["\')]*)$', r'\1', word)
+    return word.upper() if upper else word
+
+
+def render_caption(chunk, active, conf, scale, width, path):
+    """One caption line as a transparent PNG the width of the video."""
+    from PIL import Image, ImageDraw, ImageFont
+    size = conf['size'] * scale
+    upper = conf.get('upper', False)
+    texts = [_display(w[0], upper) for w in chunk]
+    while True:
+        font = ImageFont.truetype(str(CAPTION_FONT), round(size))
+        try:
+            font.set_variation_by_axes([conf.get('weight', 800)])
+        except Exception:
+            pass
+        space = font.getlength(' ')
+        widths = [font.getlength(t) for t in texts]
+        total = sum(widths) + space * (len(texts) - 1)
+        if total <= width * 0.86 or size < conf['size'] * scale * 0.6:
+            break
+        size *= 0.92
+    height = round(size * 2.0)
+    img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    x, y = (width - total) / 2, height / 2
+    pad, outline = size * 0.14, max(2, round(size * 0.09))
+    for i, (t, w) in enumerate(zip(texts, widths)):
+        if i == active and conf.get('highlight'):
+            d.rounded_rectangle([x - pad, y - size * 0.62 - pad * 0.5, x + w + pad, y + size * 0.42 + pad * 0.5],
+                                radius=size * 0.18, fill=conf['highlight'])
+        d.text((x, y), t, font=font, anchor='lm', fill=conf.get('color', '#1B2547'),
+               stroke_width=0 if i == active and conf.get('highlight') else outline,
+               stroke_fill=conf.get('outline', '#ffffff'))
+        x += w + space
+    img.save(path)
+    return height
+
+
+def finish(story: Story, result: dict, files: list):
+    """Burn in captions and mix in music, in one ffmpeg pass over the video."""
+    out = Path(result['file'])
+    if out.suffix.lower() not in ('.mp4', '.mov'):
+        print(f'  captions and music need an .mp4 or .mov output; {out.name} left as drawn')
+        return
+    duration = result['duration']
+    W, H = result['width'], result['height']
+    pg = page_of(story)
+    scale = W / pg['w']
+    args = ['ffmpeg', '-v', 'error', '-y', '-i', str(out)]
+    vf, af, maps = [], [], []
+    cap = story.opt('captions')
+    if cap:
+        conf = {**CAPTION_DEFAULTS[story.opt('page', 'wide')],
+                'words': 3, 'chars': 18, 'weight': 800, 'color': '#1B2547',
+                'highlight': '#ffd43b', 'outline': '#ffffff', 'upper': False,
+                **(cap if isinstance(cap, dict) else {})}
+        cdir = story.work / 'captions'
+        if cdir.exists():
+            for old in cdir.glob('*.png'):
+                old.unlink()
+        cdir.mkdir(parents=True, exist_ok=True)
+        starts = result.get('voiceStarts') or []
+        if len(starts) != len(story.beats):
+            fail('captions need every beat voiced')
+        # The timeline: (start, end, png) for every word being said.
+        spans, n, height = [], 0, None
+        for i, (b, f) in enumerate(zip(story.beats, files)):
+            timed = json.loads(Path(f).with_suffix('.words.json').read_text())
+            words = align_words(b['text'], timed)
+            stop = starts[i + 1] if i + 1 < len(starts) else duration
+            chunks = caption_chunks(words, conf['words'], conf['chars'])
+            for c_i, c in enumerate(chunks):
+                last_end = c[-1][2] + 0.25
+                if c_i + 1 < len(chunks):
+                    last_end = chunks[c_i + 1][0][1]
+                for w_i, w in enumerate(c):
+                    a = starts[i] + w[1]
+                    e = starts[i] + (c[w_i + 1][1] if w_i + 1 < len(c) else last_end)
+                    e = min(e, stop)
+                    if e - a < 0.02:
+                        continue
+                    png = cdir / f'{n:04d}.png'
+                    height = render_caption(c, w_i, conf, scale, W, png)
+                    spans.append((a, e, png))
+                    n += 1
+        if spans:
+            from PIL import Image
+            blank = cdir / 'blank.png'
+            Image.new('RGBA', (W, height), (0, 0, 0, 0)).save(blank)
+            lines, t = ['ffconcat version 1.0'], 0.0
+            for a, e, png in spans:
+                if a > t + 0.001:
+                    lines += [f"file '{blank}'", f'duration {a - t:.4f}']
+                lines += [f"file '{png}'", f'duration {e - max(a, t):.4f}']
+                t = e
+            lines += [f"file '{blank}'", f'duration {max(duration - t, 0.04):.4f}', f"file '{blank}'"]
+            listing = cdir / 'captions.ffconcat'
+            listing.write_text('\n'.join(lines) + '\n')
+            args += ['-f', 'concat', '-safe', '0', '-i', str(listing)]
+            top = round(conf['y'] * scale - height / 2)
+            vf = [f'[1:v]format=rgba[cap];[0:v][cap]overlay=0:{top}:eof_action=pass:format=auto,format=yuv420p[v]']
+            maps += ['-map', '[v]']
+    if not maps:
+        maps += ['-map', '0:v']
+    music = story.opt('music')
+    if music:
+        m = music if isinstance(music, dict) else {'file': music}
+        f = story.rel(m['file'])
+        if not f.exists():
+            fail(f'music {f} not found')
+        idx = 2 if vf else 1
+        args += ['-stream_loop', '-1', '-i', str(f)]
+        fade = min(2.0, duration / 4)
+        af = [f'[{idx}:a]volume={m.get("volume", 0.12)},atrim=0:{duration:.3f},'
+              f'afade=t=out:st={duration - fade:.3f}:d={fade:.3f}[bed];'
+              f'[0:a][bed]amix=inputs=2:duration=first:normalize=0[a]']
+        maps += ['-map', '[a]']
+    else:
+        maps += ['-map', '0:a?']
+    graph = ';'.join(vf + af)
+    if graph:
+        args += ['-filter_complex', graph]
+    args += maps
+    args += (['-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-pix_fmt', 'yuv420p'] if vf else ['-c:v', 'copy'])
+    args += (['-c:a', 'aac', '-b:a', '160k'] if music else ['-c:a', 'copy'])
+    tmp = out.with_name(out.stem + '.finishing' + out.suffix)
+    args += ['-movflags', '+faststart', str(tmp)]
+    r = subprocess.run(args, text=True, capture_output=True)
+    if r.returncode:
+        sys.stderr.write(r.stderr)
+        fail('ffmpeg could not add the captions or music')
+    tmp.replace(out)
 
 
 # ---------------------------------------------------------------- commands
@@ -688,8 +938,9 @@ def cmd_check(story: Story, args):
     report_small(story, result)
     n = report_unspoken(story, result)
     words = sum(len(b['text'].split()) for b in story.beats)
+    seconds = words / (WPM * float(story.opt('speed', 1.0))) * 60
     print(f'{len(story.beats)} beats in {len(runs)} scenes, {words} words, '
-          f'about {words / WPM:.1f} min of speech; {n} unspoken')
+          f'about {int(seconds // 60)}:{int(seconds % 60):02d} of speech; {n} unspoken')
     sys.exit(1 if n else 0)
 
 
@@ -710,6 +961,10 @@ def cmd_video(story: Story, args):
     board = write_board(story, storyboard(story, runs, audio=files), 'storyboard.json')
     print('drawing')
     _, result = animate(board, '--sheet', str(story.work / 'sheet.png'))
+    if story.opt('captions') or story.opt('music'):
+        print('captions and music' if story.opt('captions') and story.opt('music')
+              else 'captions' if story.opt('captions') else 'music')
+        finish(story, result, files)
     s = result['duration']
     print(f'{result["file"]}\n  {int(s // 60)}:{int(s % 60):02d}, rendered in '
           f'{result["renderSeconds"]:.0f} s, {result["audio"]} voice clips')

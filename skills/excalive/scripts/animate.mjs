@@ -1246,6 +1246,10 @@ function planTransition(k, previous) {
     };
   };
 
+  // `say`: an element enters as the voice says its word or phrase, from the
+  // word times saved beside the keyframe's voice clip (excalive video writes
+  // them). Without a voice, or when the words are not found, it keeps its turn.
+  const spoken = saidAt(spec);
   const runs = new Map();
   units.forEach((members, i) => {
     const slot = enterStart + i * stagger;
@@ -1257,6 +1261,9 @@ function planTransition(k, previous) {
       const waits = Boolean(el.containerId) && !asked;
       const fxSpec = { effect: defaultEnter(el), ...(asked ?? {}) };
       const run = job(el, 'enter', fxSpec, settings, waits ? slot + enterDuration * 0.5 : slot, waits ? enterDuration * 0.5 : enterDuration);
+      const cue = fxSpec.say ?? settings.say ?? (el.containerId ? k.settings.get(el.containerId)?.say : undefined);
+      const at = cue != null ? spoken(cue) : null;
+      if (at != null) run.start = Math.max(enterStart, at);
       if (isTransient(settings)) run.transient = settings;
       runs.set(el.id, run);
     }
@@ -1287,6 +1294,32 @@ function planTransition(k, previous) {
   }
   const unitBoxes = new Map(units.map(members => [unitKey(members[0]), boundsOf(members)]));
   return { from, to, runs, exitDuration, total, unitBoxes };
+}
+
+// Seconds from a keyframe's start to where its voice says `phrase`, less a
+// short lead so the element lands with the word.
+const SAY_LEAD = 0.12;
+function saidAt(spec) {
+  let words = null;
+  if (spec.audio) {
+    try {
+      const file = spec.audio.replace(/\.wav$/, '.words.json');
+      if (fs.existsSync(file)) words = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch { words = null; }
+  }
+  const norm = w => String(w).toLowerCase().replace(/[^0-9a-z]/g, '');
+  const tokens = (words ?? []).filter(t => norm(t[0]));
+  return phrase => {
+    const want = String(phrase).split(/\s+/).map(norm).filter(Boolean);
+    if (!want.length || !tokens.length) return null;
+    for (let i = 0; i + want.length <= tokens.length; i++) {
+      if (want.every((w, j) => norm(tokens[i + j][0]) === w)) {
+        return Math.max(0, (spec.audioDelay ?? 0) + tokens[i][1] - SAY_LEAD);
+      }
+    }
+    process.stderr.write(`animate: say "${phrase}" is not in the keyframe's words\n`);
+    return null;
+  };
 }
 
 const asList = value => (value == null ? [] : Array.isArray(value) ? value : [value]);
@@ -1842,7 +1875,8 @@ async function main() {
   process.stdout.write(JSON.stringify({
     success: true, file: options.out, frames: startFrame, duration: Number(totalSeconds.toFixed(2)),
     width: options.width, height: options.height, fps: options.fps, renderSeconds: Number(seconds.toFixed(1)),
-    audio: audio.length, unspoken: unspoken.length, ...(sheets ? { sheets } : {}),
+    audio: audio.length, voiceStarts: audio.map(a => Number(a.at.toFixed(4))),
+    unspoken: unspoken.length, ...(sheets ? { sheets } : {}),
   }) + '\n');
 }
 
