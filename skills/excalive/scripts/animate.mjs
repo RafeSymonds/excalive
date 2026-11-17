@@ -1842,7 +1842,8 @@ async function main() {
   process.stdout.write(JSON.stringify({
     success: true, file: options.out, frames: startFrame, duration: Number(totalSeconds.toFixed(2)),
     width: options.width, height: options.height, fps: options.fps, renderSeconds: Number(seconds.toFixed(1)),
-    audio: audio.length, unspoken: unspoken.length, ...(sheets ? { sheets } : {}),
+    audio: audio.length, voiceStarts: audio.map(a => Number(a.at.toFixed(4))),
+    unspoken: unspoken.length, ...(sheets ? { sheets } : {}),
   }) + '\n');
 }
 

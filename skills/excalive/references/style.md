@@ -35,15 +35,17 @@ else in this guide holds; the positions change.
 
 | Part | Where | Size |
 |---|---|---|
-| Title | x 60, y 220, left-aligned | 56 (set `title: {size: 56}`) |
-| Content area | x 60 to 800, y 400 to 1260 | |
+| Title | x 60, y 200, left-aligned | 56 (set `title: {size: 56}`) |
+| Content area | x 60 to 800, y 330 to 1060 | |
+| Captions | centered on y 1165 | 76 |
 
 The page keeps clear of what phone apps draw over a short: the top 200
-units, the bottom 340, and a strip down the right edge. A card's `frame`
-is 900 by 1600, and `check` reports text past x 800 or below y 1260.
-Draw diagrams about 740 wide and 840 tall, with labels at 32 or more:
-a wide diagram fitted into the tall page shrinks to half its size. A
-`slides` deck from a tall story gets `aspectRatio: 9/16`.
+units, the bottom 340, and a strip down the right edge. The band
+between the content area and that bottom strip holds the captions. A
+card's `frame` is 900 by 1600, and `check` reports text past x 800 or
+below y 1060. Draw diagrams 740 by 730, which fit at 1:1, with labels
+at 44 or more: a wide diagram fitted into the tall page shrinks to half
+its size. A `slides` deck from a tall story gets `aspectRatio: 9/16`.
 
 ## Type
 
@@ -558,6 +560,34 @@ there. The mechanics, every setting and how to write an effect are in
   changes the rate, not the intonation. The levers are the words
   (sentence length) and the pauses, `gap` after each beat (0.5 s) and
   `scene_gap` after each slide (1.0 s).
+
+## A short
+
+A short is not a talk cut down. It is built for a phone, for a viewer
+who scrolls away in the first two seconds unless something makes them
+stay.
+
+- **Hook first.** The first beat states the problem or the surprising
+  fact, on a card already drawn. No title card, no greeting, no "in this
+  video".
+- **One sentence per beat, and every beat changes the picture.** A new
+  box, a new label, a camera move: something about every two or three
+  seconds. Split a sentence across two beats when half of it earns its
+  own picture ("Every new session" / "starts from zero.").
+- **Diagrams, not slides.** Scenes in a short carry no titles: leave out
+  the `| title` and the captions carry the words. Draw big: boxes
+  600 wide, labels at 56 to 72.
+- **Pace.** `speed: 1.1`, `transition: 0.55`, `audio_delay: 0.1`,
+  `gap: 0.12`, `scene_gap: 0.2`, `end_hold: 0.6`. 30 to 45 seconds,
+  70 to 110 words.
+- **Captions on.** `captions: true` burns in a few words at a time with
+  the word being said highlighted. Most people watch shorts muted.
+- **Pop what lands.** `{"excalive": {"enter": "pop"}}` on the element a
+  beat lands on: the key word, the box that answers the problem.
+- **Pay off, then loop.** End on the payoff, with no end card, and make
+  the last line run into the first ("Skip that file, and" ... "Your AI
+  forgets everything"), so a replay reads as one thought.
+- **Talk to one person.** "You" and "your", short words, no hedging.
 
 ## Voice: Kokoro
 
