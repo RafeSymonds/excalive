@@ -31,6 +31,7 @@ Front matter (paths are relative to the story file):
 
   scenes:  [cards, ../diagrams]      searched in order for <scene>.excalidraw
   video:   out/talk.mp4
+  page:    wide                      wide (1600 by 900, 16:9) or tall (900 by 1600, 9:16, for shorts)
   work:    out/talk-work             voice cache, storyboards, contact sheets
   voice:   af_heart                  Kokoro voice; speed: 1.0
   lexicon: [lexicon.json]            pronunciations: {term: say} or {term: {ipa: ...}}
@@ -222,14 +223,14 @@ def resolve(story: Story, need_words=False):
         pinned = ['title'] if own else ['story-title'] if title_el else []
         # A scene that moves in on part of itself is clipped below the title,
         # or what lies above its focus shows through behind the title.
-        clip = TITLE_CLIP if any(b.get('focus') for b in run) else None
+        clip = title_clip(page_of(story)) if any(b.get('focus') for b in run) else None
         for j, b in enumerate(run):
             b['run_title'] = drawn
             b['name'] = title or (own['text'] if own else run[0]['scene'])
             b['first'] = j == 0
             b['last'] = j == len(run) - 1
             b['text_x'] = scene_text_x(story, run[0]['scene'], s['elements'])
-            b['camera'] = focus_camera(b['focus']) if b.get('focus') else camera
+            b['camera'] = focus_camera(page_of(story), b['focus']) if b.get('focus') else camera
             b['title_el'] = title_el
             b['pin'] = {'ids': pinned, 'camera': camera} if pinned else None
             b['clip'] = clip
@@ -267,17 +268,35 @@ def scene_text_x(story: Story, scene: str, elements) -> str:
     return 'center' if centered and all(float(e['x']).is_integer() for e in centered) else 'left'
 
 
-# Every slide, and every frame of a video, is laid out on one page, 1600 by
-# 900: the title at the same place and size on every scene, and a diagram
-# scaled to fit the area under it and centered there. Cards are drawn on that
-# page already (their invisible `frame` is the page), so they show as drawn.
-# Before this each scene's camera fit its own diagram, and the title moved
-# and changed size from one slide to the next.
-PAGE_W, PAGE_H = 1600, 900
-TITLE_X, TITLE_Y = 120, 100
-CONTENT = (120, 220, 1360, 620)  # x, y, width, height of the area under the title
-# The page below the title (y 190 down), as fractions of the screen.
-TITLE_CLIP = {'x': 0, 'y': 190 / PAGE_H, 'width': 1, 'height': (PAGE_H - 190) / PAGE_H}
+# Every slide, and every frame of a video, is laid out on one page: the title
+# at the same place and size on every scene, and a diagram scaled to fit the
+# area under it and centered there. Cards are drawn on that page already
+# (their invisible `frame` is the page), so they show as drawn. Before this
+# each scene's camera fit its own diagram, and the title moved and changed
+# size from one slide to the next.
+#
+# `page: wide` (the default) is 1600 by 900, rendered at 1920 by 1080.
+# `page: tall` is 900 by 1600, rendered at 1080 by 1920, for vertical shorts.
+# Its title and content area keep clear of what the phone apps draw over a
+# short: the top 200 units, the bottom 340, and a strip down the right edge.
+PAGES = {
+    'wide': {'w': 1600, 'h': 900, 'title': (120, 100), 'content': (120, 220, 1360, 620),
+             'clip_y': 190, 'right': 1480, 'bottom': 860, 'video': (1920, 1080)},
+    'tall': {'w': 900, 'h': 1600, 'title': (60, 220), 'content': (60, 400, 740, 840),
+             'clip_y': 370, 'right': 800, 'bottom': 1260, 'video': (1080, 1920)},
+}
+
+
+def page_of(story: Story) -> dict:
+    name = story.opt('page', 'wide')
+    if name not in PAGES:
+        fail(f'page: {name!r} is not one of {", ".join(PAGES)}')
+    return PAGES[name]
+
+
+def title_clip(pg: dict) -> dict:
+    """The page below the title, as fractions of the screen."""
+    return {'x': 0, 'y': pg['clip_y'] / pg['h'], 'width': 1, 'height': (pg['h'] - pg['clip_y']) / pg['h']}
 
 
 def title_style(story: Story):
@@ -292,17 +311,19 @@ def page(story: Story, elements, title, own):
     f = frame_of(elements)
     if own:
         return {'x': f['x'], 'y': f['y'], 'width': f['width'], 'height': f['height']}, None
-    cx, cy, cw, ch = CONTENT
+    pg = page_of(story)
+    cx, cy, cw, ch = pg['content']
     s = min(cw / f['width'], ch / f['height'])
     left = cx + (cw - f['width'] * s) / 2
     top = cy + (ch - f['height'] * s) / 2
-    cam = {'x': f['x'] - left / s, 'y': f['y'] - top / s, 'width': PAGE_W / s, 'height': PAGE_H / s}
+    cam = {'x': f['x'] - left / s, 'y': f['y'] - top / s, 'width': pg['w'] / s, 'height': pg['h'] / s}
     if not title:
         return cam, None
     size, color, font = title_style(story)
     # Page units divided by the scale, so the title lands the same on screen.
-    return cam, {'id': 'story-title', 'type': 'text', 'x': cam['x'] + TITLE_X / s,
-                 'y': cam['y'] + TITLE_Y / s, 'text': title, 'fontSize': size / s,
+    tx, ty = pg['title']
+    return cam, {'id': 'story-title', 'type': 'text', 'x': cam['x'] + tx / s,
+                 'y': cam['y'] + ty / s, 'text': title, 'fontSize': size / s,
                  'fontFamily': font, 'strokeColor': color, 'textAlign': 'left'}
 
 
@@ -310,15 +331,15 @@ def page(story: Story, elements, title, own):
 FOCUS_PAD = 40
 
 
-def focus_camera(box):
+def focus_camera(pg: dict, box):
     """A camera that fits `box` (x0, y0, x1, y1 in scene units) into the
     content area under the title, centered: a step moving in on part of its
     scene, the way the whole diagram is fitted there."""
     x0, y0, x1, y1 = box
-    cx, cy, cw, ch = CONTENT
+    cx, cy, cw, ch = pg['content']
     k = max((x1 - x0) / (cw - 2 * FOCUS_PAD), (y1 - y0) / (ch - 2 * FOCUS_PAD), 1e-6)
     return {'x': (x0 + x1) / 2 - (cx + cw / 2) * k, 'y': (y0 + y1) / 2 - (cy + ch / 2) * k,
-            'width': PAGE_W * k, 'height': PAGE_H * k}
+            'width': pg['w'] * k, 'height': pg['h'] * k}
 
 
 def bounds(elements):
@@ -381,7 +402,9 @@ def storyboard(story: Story, runs, audio=None, names=False):
             k['hold'] = story.opt('end_hold', 4.0) if end else \
                 story.opt('scene_gap', 1.0) if b['last'] else story.opt('gap', 0.5)
         keyframes.append(k)
-    board = {'width': 1920, 'height': 1080, 'fps': 30, 'keyframes': keyframes}
+    pg = page_of(story)
+    board = {'width': pg['video'][0], 'height': pg['video'][1], 'fps': 30, 'keyframes': keyframes,
+             'page': {'width': pg['w'], 'height': pg['h'], 'right': pg['right'], 'bottom': pg['bottom']}}
     if story.opt('effects'):
         board['effects'] = [str(story.rel(f)) for f in story.opt('effects')]
     if story.opt('video'):
@@ -720,6 +743,8 @@ def cmd_slides(story: Story, args):
             q.unlink()
 
     head = dict(conf.get('headmatter') or {})
+    if story.opt('page') == 'tall':
+        head.setdefault('aspectRatio', '9/16')
     out = []
     style = ('<style>\n:global(.story) { background: #fff; }\n'
              ':global(.story h1) { position: absolute; width: 1px; height: 1px; overflow: hidden;'

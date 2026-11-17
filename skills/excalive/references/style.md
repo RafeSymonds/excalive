@@ -27,6 +27,24 @@ Every slide and every video frame is one page, 1600 by 900 units.
   that, each slide's camera fit its own diagram and the title moved and
   changed size from slide to slide.
 
+### A tall page, for shorts
+
+`page: tall` in a story's front matter turns the page upright: 900 by
+1600 units, rendered at 1080 by 1920, for vertical shorts. Everything
+else in this guide holds; the positions change.
+
+| Part | Where | Size |
+|---|---|---|
+| Title | x 60, y 220, left-aligned | 56 (set `title: {size: 56}`) |
+| Content area | x 60 to 800, y 400 to 1260 | |
+
+The page keeps clear of what phone apps draw over a short: the top 200
+units, the bottom 340, and a strip down the right edge. A card's `frame`
+is 900 by 1600, and `check` reports text past x 800 or below y 1260.
+Draw diagrams about 740 wide and 840 tall, with labels at 32 or more:
+a wide diagram fitted into the tall page shrinks to half its size. A
+`slides` deck from a tall story gets `aspectRatio: 9/16`.
+
 ## Type
 
 The drawings are hand-drawn; the words are not. Hand-drawn text for
