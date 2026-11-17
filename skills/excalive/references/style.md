@@ -584,9 +584,10 @@ from clipped sentences.
 - **Diagrams, not slides.** Scenes in a short carry no titles: leave out
   the `| title` and the captions carry the words. Draw big: boxes
   600 wide, labels at 56 to 72.
-- **Pace.** `speed: 1.1`, `transition: 0.6`, `audio_delay: 0.15`,
-  `gap: 0.4`, `scene_gap: 0.5`, `end_hold: 1.5`. Shorter gaps run the
-  sentences together. 30 to 45 seconds, 80 to 110 words.
+- **Pace.** `speed: 1.1`, `trim: true`, `transition: 0.6`,
+  `audio_delay: 0.1`, `gap: 0.3`, `scene_gap: 0.4`, `end_hold: 1.5`:
+  about half a second between sentences. Without `trim`, Kokoro's own
+  padding adds about half a second to every pause. 30 to 45 seconds, 80 to 110 words.
 - **Captions on.** `captions: true` burns in a few words at a time with
   the word being said highlighted. Most people watch shorts muted.
 - **Pop what lands.** `{"excalive": {"enter": "pop"}}` on the element a

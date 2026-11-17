@@ -38,6 +38,7 @@ Front matter (paths are relative to the story file):
   lexicon: [lexicon.json]            pronunciations: {term: say} or {term: {ipa: ...}}
   audio_delay: 0.3   gap: 0.5   scene_gap: 1.0   end_hold: 4.0
   transition: 1.2                    seconds each step takes to draw in; 0.5 to 0.7 for a fast short
+  trim:    false                     cut Kokoro's own silence (about 0.5 s) off each clip, so gap is the pause
   captions: true                     word-timed captions burned in (see Captions); or {size: 68, ...}
   music:   {file: bed.mp3, volume: 0.12}   a track looped under the voice, faded out at the end
   text_x:  auto                      auto, left or center, or {scene: left} (see scene_text_x)
@@ -605,15 +606,34 @@ def lint(story: Story, lexicon: dict):
     return found + again
 
 
+# Kokoro pads each clip with about 0.3 s of silence before the first word
+# and 0.2 s after the last. `trim: true` cuts it to TRIM_KEEP, so the pause
+# between two beats is what `gap` and `audio_delay` say.
+TRIM_KEEP = 0.04
+TRIM_LEVEL = 0.01
+
+
+def trim_silence(audio, words):
+    import numpy as np
+    loud = np.flatnonzero(np.abs(audio) > TRIM_LEVEL)
+    if not len(loud):
+        return audio, words
+    keep = int(TRIM_KEEP * RATE)
+    a, b = max(0, loud[0] - keep), min(len(audio), loud[-1] + keep + 1)
+    shift = a / RATE
+    return audio[a:b], [[w, round(max(0.0, s - shift), 3), round(max(0.0, e - shift), 3)] for w, s, e in words]
+
+
 def voice(story: Story, voice_name: str, speed: float):
     """One wav per beat in <work>/audio, named by the hash of what it says."""
     say = compile_lexicon(load_lexicon(story))
+    trim = bool(story.opt('trim', False))
     adir = story.work / 'audio'
     adir.mkdir(parents=True, exist_ok=True)
     files, todo = [], []
     for b in story.beats:
         chunks = chunk([say(p) for p in flatten(b['text'])])
-        h = hashlib.sha1(json.dumps([chunks, voice_name, speed]).encode()).hexdigest()[:16]
+        h = hashlib.sha1(json.dumps([chunks, voice_name, speed] + (['trim'] if trim else [])).encode()).hexdigest()[:16]
         f = adir / f'{h}.wav'
         files.append(f)
         if not f.exists() or not f.with_suffix('.words.json').exists():
@@ -642,11 +662,14 @@ def voice(story: Story, voice_name: str, speed: float):
                     at += len(audio[-1]) / RATE
             if not audio:
                 fail(f'Kokoro produced no audio for {f.name}')
+            audio = np.concatenate(audio)
+            if trim:
+                audio, words = trim_silence(audio, words)
             f.with_suffix('.words.json').write_text(json.dumps(words))
             # Written under a temporary name, so an interrupted run never
             # leaves a truncated clip in the cache.
             tmp = f.with_suffix('.part.wav')
-            sf.write(str(tmp), np.concatenate(audio), RATE)
+            sf.write(str(tmp), audio, RATE)
             tmp.rename(f)
             print(f'  {n}/{len(todo)}', end='\r', flush=True)
         print()

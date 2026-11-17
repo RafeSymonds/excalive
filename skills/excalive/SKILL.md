@@ -151,7 +151,8 @@ modules), `text_x`, `strict`, `intro`
 
 For a short, `page: tall` (9:16), `transition` (seconds each step takes
 to draw in, 1.2 by default), `captions: true` (word-timed captions
-burned in, timed from the voice) and `music: {file, volume}` (a track
+burned in, timed from the voice), `trim: true` (cut Kokoro's own silence
+off each clip, so `gap` is the whole pause) and `music: {file, volume}` (a track
 under the voice). `references/style.md` has the short's recipe.
 
 ## Commands
