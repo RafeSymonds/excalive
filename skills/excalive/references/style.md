@@ -564,30 +564,34 @@ there. The mechanics, every setting and how to write an effect are in
 ## A short
 
 A short is not a talk cut down. It is built for a phone, for a viewer
-who scrolls away in the first two seconds unless something makes them
-stay.
+who scrolls away in the first seconds unless something makes them stay.
+Fast comes from the picture changing often and from cutting ideas, not
+from clipped sentences.
 
-- **Hook first.** The first beat states the problem or the surprising
-  fact, on a card already drawn. No title card, no greeting, no "in this
+- **Hook first.** The first sentence states the problem the viewer has,
+  on a card already drawn. No title card, no greeting, no "in this
   video".
-- **One sentence per beat, and every beat changes the picture.** A new
-  box, a new label, a camera move: something about every two or three
-  seconds. Split a sentence across two beats when half of it earns its
-  own picture ("Every new session" / "starts from zero.").
+- **Then why it hurts, the answer, how it works, the takeaway.** One
+  sentence for each of the first two, three or four for how it works,
+  and a closing card with the one line to remember. The story should
+  make sense heard once with no pictures.
+- **One complete sentence per beat.** Never split a sentence across
+  beats: each beat is voiced alone, so a split sentence loses its
+  intonation and sounds chopped. No fragments ("Again. And again.").
+- **The picture changes inside a sentence.** When a sentence names
+  several things, put them in one step and give each a `say` cue
+  (`effects.md`), so each pops in as its word is spoken.
 - **Diagrams, not slides.** Scenes in a short carry no titles: leave out
   the `| title` and the captions carry the words. Draw big: boxes
   600 wide, labels at 56 to 72.
-- **Pace.** `speed: 1.1`, `transition: 0.55`, `audio_delay: 0.1`,
-  `gap: 0.12`, `scene_gap: 0.2`, `end_hold: 0.6`. 30 to 45 seconds,
-  70 to 110 words.
+- **Pace.** `speed: 1.1`, `transition: 0.6`, `audio_delay: 0.15`,
+  `gap: 0.4`, `scene_gap: 0.5`, `end_hold: 1.5`. Shorter gaps run the
+  sentences together. 30 to 45 seconds, 80 to 110 words.
 - **Captions on.** `captions: true` burns in a few words at a time with
   the word being said highlighted. Most people watch shorts muted.
 - **Pop what lands.** `{"excalive": {"enter": "pop"}}` on the element a
   beat lands on: the key word, the box that answers the problem.
-- **Pay off, then loop.** End on the payoff, with no end card, and make
-  the last line run into the first ("Skip that file, and" ... "Your AI
-  forgets everything"), so a replay reads as one thought.
-- **Talk to one person.** "You" and "your", short words, no hedging.
+- **Talk to one person.** "You" and "your", everyday words, no hedging.
 
 ## Voice: Kokoro
 

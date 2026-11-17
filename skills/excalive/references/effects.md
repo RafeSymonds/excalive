@@ -46,6 +46,7 @@ keeps and which travels with the element from step to step:
 | `exit` | the same | How it leaves (default `fade`) |
 | `change` | the same | How it changes between steps (default `morph`) |
 | `delay` | seconds | Wait this long: after its turn in the entrance order when it enters, after the step starts when it changes |
+| `say` | a word or phrase from the beat | Enter as the voice says it, in a rendered video. Use it when one sentence lists several things on screen, so each lands with its word. Slides and `check` ignore it |
 | `seconds` | seconds | How long its entrance or change runs. For an exit, put it inside the exit's effect object: `{"exit": {"effect": "write", "seconds": 1.2}}` |
 | `easing` | `linear`, `inCubic`, `outCubic`, `inOutCubic`, `outBack` | The curve of its run |
 | `transient` | `true`, or seconds to stay | It exists only in its step's transition: it enters, stays that long, then leaves. It is not in the step's resting frame or still |
@@ -109,6 +110,12 @@ starts entering while the dot is still moving. To hold it until the dot
 arrives, give it a `delay` in the step's `set` (about 1.2 s after its
 turn covers a travel of 0.9 s). The same goes for a change that should
 wait for the camera: `{"change": {"effect": "count", "delay": 1.0}}`.
+
+A list said in one sentence ("the tests, the decisions, and the
+mistakes") is one step whose items each carry a `say`, set in the
+step: `{"ids": [...], "set": {"i1": {"say": "decisions"}}}`. A phrase
+of several words matches the first place they are said in a row, so
+`"and again"` picks the second "again" in "again, and again".
 
 ## Built-in effects
 
