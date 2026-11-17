@@ -704,16 +704,19 @@ function smallScreenText(keyframes, files, options) {
 }
 
 // Text that runs past where it should end, by real widths: on a card (a
-// 1600 by 900 `frame`), a line past the right margin at x 1480 or below the
-// content area at y 860; in a diagram, text outside its `frame`, which is
-// what gets fitted to the page. Labels bound in a shape are not checked.
-function overflowText(keyframes) {
+// `frame` the size of the page, 1600 by 900 unless the storyboard's `page`
+// says otherwise), a line past the right margin (x 1480) or below the content
+// area (y 860); in a diagram, text outside its `frame`, which is what gets
+// fitted to the page. Labels bound in a shape are not checked.
+const WIDE_PAGE = { width: 1600, height: 900, right: 1480, bottom: 860 };
+
+function overflowText(keyframes, page = WIDE_PAGE) {
   const out = [];
   let shown = new Map();
   keyframes.forEach((k, i) => {
     if (k.spec.clear) shown = new Map();
     const frame = k.elements.find(el => el.id === 'frame');
-    const card = frame && Math.round(frame.width) === 1600 && Math.round(frame.height) === 900;
+    const card = frame && Math.round(frame.width) === page.width && Math.round(frame.height) === page.height;
     for (const el of k.all) {
       if (el.type !== 'text' || el.isDeleted || el.containerId || !frame || el.id === 'story-title') continue;
       if (shown.get(el.id) === el.text) continue;
@@ -725,8 +728,8 @@ function overflowText(keyframes) {
       const x1 = Math.round(left + w - frame.x), y1 = Math.round(el.y + h - frame.y);
       const problems = [];
       if (card) {
-        if (x1 > 1482) problems.push(`ends at x ${x1}, past the margin at 1480`);
-        if (y1 > 862) problems.push(`ends at y ${y1}, below the content area at 860`);
+        if (x1 > page.right + 2) problems.push(`ends at x ${x1}, past the margin at ${page.right}`);
+        if (y1 > page.bottom + 2) problems.push(`ends at y ${y1}, below the content area at ${page.bottom}`);
       } else {
         if (left < frame.x - 2 || x1 > frame.width + 2) problems.push(`runs outside its frame (x ${Math.round(left - frame.x)} to ${x1} in a frame ${Math.round(frame.width)} wide)`);
         if (el.y < frame.y - 2 || y1 > frame.height + 2) problems.push(`runs outside its frame (y ${Math.round(el.y - frame.y)} to ${y1} in a frame ${Math.round(frame.height)} tall)`);
@@ -1729,7 +1732,7 @@ async function main() {
   for (const u of unspoken) {
     process.stderr.write(`animate: keyframe ${u.keyframe} shows "${u.text}" but its narration never says "${u.missing.join('", "')}"\n`);
   }
-  const overflow = overflowText(keyframes);
+  const overflow = overflowText(keyframes, board.page ?? WIDE_PAGE);
   for (const o of overflow) process.stderr.write(`animate: keyframe ${o.keyframe} "${o.text}" ${o.problem}\n`);
   const small = smallScreenText(keyframes, options.files, options);
   for (const m of small) process.stderr.write(`animate: keyframe ${m.keyframe} shows screenshot "${m.id}" with its text about ${m.px} px tall\n`);
@@ -1851,6 +1854,8 @@ await main();
 // {
 //   "output": "explainer.mp4",   // .mp4 .mov .webm .gif, or a directory for PNG frames
 //   "width": 1920, "height": 1080, "fps": 30,
+//   "page": {"width": 1600, "height": 900, "right": 1480, "bottom": 860},
+//                                // the card page for the overflow check (excalive sets it)
 //   "background": "#ffffff", "dark": false,
 //   "padding": 60,               // camera padding around content (scene units)
 //   "boil": 0,                   // hand-drawn wobble: re-seed strokes N times per second

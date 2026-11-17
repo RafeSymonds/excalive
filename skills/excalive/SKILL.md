@@ -53,6 +53,8 @@ tools, arrows, layout checks) use mcp-excalidraw-server's own skill.
   id `frame` at (0, 0) and a text element with id `title` at (120, 100).
 - A **diagram** is drawn anywhere, about 1360 wide, with an invisible
   `frame` rectangle around the whole drawing in every step.
+- A vertical short uses `page: tall`: a 900 by 1600 page, title at
+  (60, 220), diagrams about 740 wide. `references/style.md` has the page.
 - Build steps go in `steps.json` beside the scenes, one list of ids per
   click: `{"scene": [["frame", "a"], ["frame", "a", "b"]]}`.
 - Elements match across steps by `id`. Same id: it moves, resizes,
