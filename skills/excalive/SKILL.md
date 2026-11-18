@@ -147,7 +147,8 @@ checked as said. Titles must be unique. Other front matter:
 `voice`, `speed`, `audio_delay` (0.3), `gap`, `scene_gap`, `end_hold`
 (4.0), `title` ({size, color, font}), `effects` (the story's own effect
 modules), `text_x`, `strict`, `intro`
-(`cut`, the default, opens on the first scene already drawn).
+(`cut`, the default, opens on the first scene already drawn, except
+elements with a `say` cue, which still enter on their word).
 
 For a short, `page: tall` (9:16), `transition` (seconds each step takes
 to draw in, 1.2 by default), `captions: true` (word-timed captions

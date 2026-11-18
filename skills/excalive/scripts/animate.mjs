@@ -1263,7 +1263,7 @@ function planTransition(k, previous) {
       const run = job(el, 'enter', fxSpec, settings, waits ? slot + enterDuration * 0.5 : slot, waits ? enterDuration * 0.5 : enterDuration);
       const cue = fxSpec.say ?? settings.say ?? (el.containerId ? k.settings.get(el.containerId)?.say : undefined);
       const at = cue != null ? spoken(cue) : null;
-      if (at != null) run.start = Math.max(enterStart, at);
+      if (at != null) { run.start = Math.max(enterStart, at); run.cued = true; }
       if (isTransient(settings)) run.transient = settings;
       runs.set(el.id, run);
     }
@@ -1288,6 +1288,12 @@ function planTransition(k, previous) {
     runs.set(el.id, job(el, 'exit', { effect: 'fade', ...(effectSpec(settings.exit) ?? {}) }, {}, 0, exitDuration));
   }
 
+  // A cut (duration 0, such as a video's opening card) shows its step at
+  // once, except elements cued to a word, which still enter as it is said:
+  // the hook card is drawn on the first frame and its last word lands on cue.
+  if (duration === 0) {
+    for (const run of runs.values()) if (!run.cued) { run.start = 0; run.length = 0; delete run.then; }
+  }
   let total = busy ? duration : 0;
   for (const run of runs.values()) {
     total = Math.max(total, run.start + run.length, run.then ? run.then.start + run.then.length : 0);
@@ -1746,7 +1752,7 @@ async function main() {
     // from one) still takes its duration to move; it would cut otherwise.
     const duration = k.spec.duration ?? DEFAULT_DURATION;
     const moves = !k.spec.clear && ['x', 'y', 'width', 'height'].some(key => Math.abs(k.fromCamera[key] - k.camera[key]) > 0.5);
-    k.total = duration === 0 ? 0 : Math.max(k.plan.total, moves ? duration : 0);
+    k.total = duration === 0 ? k.plan.total : Math.max(k.plan.total, moves ? duration : 0);
     k.transitionFrames = Math.round(k.total * options.fps);
     let hold = k.spec.hold ?? 1.2;
     if (k.spec.audio) {
