@@ -570,7 +570,8 @@ from clipped sentences.
 
 - **Hook first.** The first sentence states the problem the viewer has,
   on a card already drawn. No title card, no greeting, no "in this
-  video".
+  video". Give the word it lands on a `say` cue so it pops as it is
+  said, and the picture changes in the first two seconds.
 - **Then why it hurts, the answer, how it works, the takeaway.** One
   sentence for each of the first two, three or four for how it works,
   and a closing card with the one line to remember. The story should
