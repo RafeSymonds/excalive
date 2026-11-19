@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>excalive</title>
+<meta name="description" content="Hand-drawn slide decks and narrated videos from one markdown file. Five example videos.">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='6' width='26' height='20' rx='5' fill='%23a5d8ff' stroke='%231971c2' stroke-width='2'/%3E%3C/svg%3E">
+<style>
+  /* Excalifont, subset to the letters of the wordmark. OFL, (c) Excalidraw. */
+  @font-face {
+    font-family: "Excalifont";
+    src: url("data:font/woff2;base64,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") format("woff2");
+    font-display: block;
+  }
+  /* Nunito is the font excalive draws slide titles in. */
+  @font-face {
+    font-family: "Nunito";
+    src: url("skills/excalive/assets/fonts/Nunito-Regular.ttf") format("truetype");
+    font-display: swap;
+  }
+  :root {
+    color-scheme: light;
+    --paper: #ffffff;
+    --ink: #1e1e1e;
+    --muted: #55555f;
+    --rule: #e4e4ea;
+    --blue: #1971c2;
+    --blue-wash: #a5d8ff;
+    --code-bg: #f4f5f7;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 1.0625rem/1.6 "Nunito", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  ::selection { background: var(--blue-wash); color: var(--ink); }
+  a {
+    color: var(--blue);
+    text-decoration: none;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+  a:hover { text-decoration: underline; }
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 2px; }
+
+  main {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 7vw, 4.5rem) 1.25rem 4rem;
+  }
+
+  header { margin-bottom: clamp(3rem, 8vw, 4.5rem); }
+  h1 {
+    font-family: "Excalifont", "Nunito", ui-sans-serif, system-ui, sans-serif;
+    font-weight: 400;
+    font-size: clamp(3rem, 9vw, 4.5rem);
+    line-height: 1;
+    margin: 0 0 1rem;
+  }
+  .lede { margin: 0 0 1.25rem; max-width: 40rem; font-size: 1.2rem; line-height: 1.5; }
+  .lede span { color: var(--muted); }
+  .links { display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; margin: 0; padding: 0; list-style: none; }
+
+  section { scroll-margin-top: 1.5rem; }
+  section + section { margin-top: clamp(4rem, 10vw, 6rem); }
+  h2 {
+    font-weight: 400;
+    font-size: clamp(1.5rem, 3.5vw, 1.85rem);
+    line-height: 1.2;
+    margin: 0 0 0.35rem;
+    text-wrap: balance;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    margin: 0 0 0.9rem;
+    padding: 0;
+    list-style: none;
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+  }
+  section > p { margin: 0 0 1.5rem; max-width: 68ch; }
+  video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+  }
+  code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.88em; }
+
+  footer {
+    margin-top: clamp(4rem, 10vw, 6rem);
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+  }
+  footer p { margin: 0 0 0.75rem; }
+  pre {
+    margin: 0;
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    background: var(--code-bg);
+    border-radius: 6px;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>excalive</h1>
+    <p class="lede">Hand-drawn slide decks and narrated videos from one markdown file. <span>Each video below is a <code>story.md</code> and a folder of Excalidraw scenes. A local voice, Kokoro, reads each section of the story while its step draws in.</span></p>
+    <ul class="links">
+      <li><a href="https://github.com/RafeSymonds/excalive">Source on GitHub</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive#install">Install</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive#how-a-story-works">How a story works</a></li>
+    </ul>
+  </header>
+
+  <section id="hello">
+    <h2>Hello</h2>
+    <ul class="meta">
+      <li>0:45</li>
+      <li><a href="https://github.com/RafeSymonds/excalive/blob/main/examples/hello/story.md">story.md</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive/tree/main/examples/hello/scenes">scenes</a></li>
+    </ul>
+    <p>The smallest complete story, and the one to copy when you start your own: a title card, a list that builds one item per click, a three-step diagram and an end card.</p>
+    <video controls playsinline preload="metadata" poster="examples/hello/poster.jpg" aria-label="Hello, a 45 second narrated video">
+      <source src="examples/hello/hello.mp4" type="video/mp4">
+    </video>
+  </section>
+
+  <section id="dns">
+    <h2>How a browser finds a website</h2>
+    <ul class="meta">
+      <li>2:01</li>
+      <li><a href="https://github.com/RafeSymonds/excalive/blob/main/examples/dns/story.md">story.md</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive/tree/main/examples/dns/scenes">scenes</a></li>
+    </ul>
+    <p>One arrow per step as the resolver asks the root, TLD and authoritative servers, then caches the answer, and the camera moves in on the cache while the title stays put. Blue asks, gray refers, green is the address.</p>
+    <video controls playsinline preload="metadata" poster="examples/dns/poster.jpg" aria-label="How a browser finds a website, a two minute narrated video">
+      <source src="examples/dns/dns.mp4" type="video/mp4">
+    </video>
+  </section>
+
+  <section id="binary-search">
+    <h2>Binary search</h2>
+    <ul class="meta">
+      <li>1:30</li>
+      <li><a href="https://github.com/RafeSymonds/excalive/blob/main/examples/binary-search/story.md">story.md</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive/tree/main/examples/binary-search/scenes">scenes</a></li>
+    </ul>
+    <p>A search for 53 in fifteen sorted numbers. <code>lo</code>, <code>hi</code> and <code>mid</code> slide to their new boxes, the ruled-out half turns gray, and the answer turns green. A code card with notes follows.</p>
+    <video controls playsinline preload="metadata" poster="examples/binary-search/poster.jpg" aria-label="Binary search, a 90 second narrated video">
+      <source src="examples/binary-search/binary-search.mp4" type="video/mp4">
+    </video>
+  </section>
+
+  <section id="motion">
+    <h2>How a view counter counts</h2>
+    <ul class="meta">
+      <li>1:27</li>
+      <li><a href="https://github.com/RafeSymonds/excalive/blob/main/examples/motion/story.md">story.md</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive/tree/main/examples/motion/scenes">scenes</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive/blob/main/examples/motion/effects.mjs">effects.mjs</a></li>
+    </ul>
+    <p>One web request, from the click to the count. The camera moves in on the database while 41 counts up to 42, the new count goes back to the page, and a thousand visits later both read 1,042. The count is an effect the story defines in its own <code>effects.mjs</code>.</p>
+    <video controls playsinline preload="metadata" poster="examples/motion/poster.jpg" aria-label="How a view counter counts, a narrated video of about a minute and a half">
+      <source src="examples/motion/motion.mp4" type="video/mp4">
+    </video>
+  </section>
+
+  <section id="tour">
+    <h2>A leaderboard that sorts itself</h2>
+    <ul class="meta">
+      <li>1:41</li>
+      <li><a href="https://github.com/RafeSymonds/excalive/blob/main/examples/tour/story.md">story.md</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive/tree/main/examples/tour/scenes">scenes</a></li>
+      <li><a href="https://github.com/RafeSymonds/excalive/tree/main/examples/tour/shots">screenshots</a></li>
+    </ul>
+    <p>Screenshots of a real web page sit in the scene, with a hand-drawn ring on the row being discussed. Then a new score goes through the code in four steps, and the bars sort twice: as text, which leaves 100 last, then as numbers, which puts Grace first.</p>
+    <video controls playsinline preload="metadata" poster="examples/tour/poster.jpg" aria-label="A leaderboard that sorts itself, a narrated video of about a minute and three quarters">
+      <source src="examples/tour/tour.mp4" type="video/mp4">
+    </video>
+  </section>
+
+  <footer>
+    <p>To build one yourself, clone the repository and run from its root:</p>
+<pre><code>skills/excalive/bin/excalive check examples/hello/story.md
+skills/excalive/bin/excalive video examples/hello/story.md</code></pre>
+  </footer>
+</main>
+<script>
+  // One video plays at a time: starting one pauses the rest.
+  const videos = document.querySelectorAll("video");
+  videos.forEach((video) => {
+    video.addEventListener("play", () => {
+      videos.forEach((other) => { if (other !== video) other.pause(); });
+    });
+  });
+</script>
+</body>
+</html>
